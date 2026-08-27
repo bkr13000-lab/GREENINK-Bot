@@ -26,7 +26,7 @@ PRODUCTS = {
     "L15160": {
         "name": "EPSON L15160",
         "price": 210000,
-        "image": "1e5aefe0-ea48-5590-8fd2-23e81ef453fc_m_png_1.png",
+        "image": "L15160.png",
     },
 }
 
@@ -148,7 +148,6 @@ async def show_cart(
 
     for code, quantity in cart.items():
         product = PRODUCTS[code]
-
         subtotal = product["price"] * quantity
         total += subtotal
 
@@ -191,7 +190,7 @@ async def confirm_order(
     await update.message.reply_text(
         "✅ تم تسجيل الطلب التجريبي بنجاح\n\n"
         f"💰 إجمالي الطلب: {total:,} دج\n\n"
-        "📦 في المرحلة القادمة نضيف:\n"
+        "📦 قريباً نضيف:\n"
         "الاسم + رقم الهاتف + الولاية + العنوان\n"
         "وإرسال الطلب مباشرة إلى إدارة GREENINK.",
         reply_markup=main_keyboard(),
@@ -258,9 +257,12 @@ async def buttons(
 
     elif text == "☎️ اتصل بنا":
         await update.message.reply_text(
-            "☎️ اتصل بنا\n\n"
-            "يمكنك التواصل معنا للحصول على المزيد من المعلومات.\n\n"
-            "🟢 GREENINK",
+            "☎️ اتصل بنا - GREENINK\n\n"
+            "📱 الهاتف الأول:\n"
+            "0560095387\n\n"
+            "📱 الهاتف الثاني:\n"
+            "0775635460\n\n"
+            "🟢 نحن في خدمتكم.",
             reply_markup=main_keyboard(),
         )
 
