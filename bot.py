@@ -12,29 +12,24 @@ from telegram.ext import (
 TOKEN = os.environ.get("BOT_TOKEN")
 
 
-# =========================
-# المنتجات
-# =========================
-
 PRODUCTS = {
     "WF-C5390": {
         "name": "EPSON WF-C5390",
         "price": 195000,
+        "image": "WF-C5390_headon_690x460.jpg",
     },
     "WF-C5890": {
         "name": "EPSON WF-C5890",
         "price": 220000,
+        "image": "WF-C5890_headon_690x460.jpg",
     },
     "L15160": {
         "name": "EPSON L15160",
         "price": 210000,
+        "image": "1e5aefe0-ea48-5590-8fd2-23e81ef453fc_m_png_1.png",
     },
 }
 
-
-# =========================
-# لوحة القائمة الرئيسية
-# =========================
 
 def main_keyboard():
     keyboard = [
@@ -48,10 +43,6 @@ def main_keyboard():
         resize_keyboard=True,
     )
 
-
-# =========================
-# لوحة قسم الطابعات
-# =========================
 
 def printers_keyboard():
     keyboard = [
@@ -67,10 +58,6 @@ def printers_keyboard():
     )
 
 
-# =========================
-# لوحة السلة
-# =========================
-
 def cart_keyboard():
     keyboard = [
         ["✅ تأكيد الطلب"],
@@ -84,10 +71,6 @@ def cart_keyboard():
     )
 
 
-# =========================
-# بدء البوت
-# =========================
-
 async def start(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
@@ -100,35 +83,31 @@ async def start(
     )
 
 
-# =========================
-# عرض الطابعات
-# =========================
-
 async def show_printers(update: Update):
-    message = (
-        "🖨 قسم الطابعات\n\n"
-
-        "1️⃣ EPSON WF-C5390\n"
-        "💰 السعر: 195,000 دج\n\n"
-
-        "2️⃣ EPSON WF-C5890\n"
-        "💰 السعر: 220,000 دج\n\n"
-
-        "3️⃣ EPSON L15160\n"
-        "💰 السعر: 210,000 دج\n\n"
-
-        "👇 اختر الطابعة لإضافتها إلى السلة"
-    )
-
     await update.message.reply_text(
-        message,
+        "🖨 قسم الطابعات\n\n"
+        "👇 اختر الطابعة التي تريد إضافتها إلى السلة",
         reply_markup=printers_keyboard(),
     )
 
+    for code, product in PRODUCTS.items():
+        try:
+            with open(product["image"], "rb") as photo:
+                await update.message.reply_photo(
+                    photo=photo,
+                    caption=(
+                        f"🖨 {product['name']}\n\n"
+                        f"💰 السعر: {product['price']:,} دج"
+                    ),
+                )
+        except Exception as error:
+            print(f"Image error for {code}: {error}")
 
-# =========================
-# إضافة منتج للسلة
-# =========================
+            await update.message.reply_text(
+                f"🖨 {product['name']}\n"
+                f"💰 السعر: {product['price']:,} دج"
+            )
+
 
 async def add_product(
     update: Update,
@@ -150,10 +129,6 @@ async def add_product(
         reply_markup=printers_keyboard(),
     )
 
-
-# =========================
-# عرض السلة
-# =========================
 
 async def show_cart(
     update: Update,
@@ -179,7 +154,7 @@ async def show_cart(
 
         text += (
             f"🖨 {product['name']}\n"
-            f"💰 {product['price']:,} دج\n"
+            f"💰 السعر: {product['price']:,} دج\n"
             f"🔢 الكمية: {quantity}\n"
             f"💵 المجموع: {subtotal:,} دج\n\n"
         )
@@ -194,10 +169,6 @@ async def show_cart(
         reply_markup=cart_keyboard(),
     )
 
-
-# =========================
-# تأكيد الطلب التجريبي
-# =========================
 
 async def confirm_order(
     update: Update,
@@ -229,21 +200,17 @@ async def confirm_order(
     context.user_data["cart"] = {}
 
 
-# =========================
-# معالجة الأزرار
-# =========================
-
 async def buttons(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
     text = update.message.text
 
-    if text in ["🖨 الطابعات", "🏠 الرئيسية"]:
-        if text == "🏠 الرئيسية":
-            await start(update, context)
-        else:
-            await show_printers(update)
+    if text == "🖨 الطابعات":
+        await show_printers(update)
+
+    elif text == "🏠 الرئيسية":
+        await start(update, context)
 
     elif text == "🛒 EPSON WF-C5390":
         await add_product(update, context, "WF-C5390")
@@ -303,10 +270,6 @@ async def buttons(
             reply_markup=main_keyboard(),
         )
 
-
-# =========================
-# تشغيل البوت
-# =========================
 
 def main():
     if not TOKEN:
