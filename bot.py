@@ -12,6 +12,10 @@ from telegram.ext import (
 TOKEN = os.environ.get("BOT_TOKEN")
 
 
+# =========================
+# المنتجات
+# =========================
+
 PRODUCTS = {
     "WF-C5390": {
         "name": "EPSON WF-C5390",
@@ -31,6 +35,10 @@ PRODUCTS = {
 }
 
 
+# =========================
+# القائمة الرئيسية
+# =========================
+
 def main_keyboard():
     keyboard = [
         ["🖨 الطابعات", "🧴 الأحبار"],
@@ -43,6 +51,10 @@ def main_keyboard():
         resize_keyboard=True,
     )
 
+
+# =========================
+# قائمة الطابعات
+# =========================
 
 def printers_keyboard():
     keyboard = [
@@ -58,6 +70,10 @@ def printers_keyboard():
     )
 
 
+# =========================
+# قائمة السلة
+# =========================
+
 def cart_keyboard():
     keyboard = [
         ["✅ تأكيد الطلب"],
@@ -71,6 +87,10 @@ def cart_keyboard():
     )
 
 
+# =========================
+# البداية
+# =========================
+
 async def start(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
@@ -83,7 +103,12 @@ async def start(
     )
 
 
+# =========================
+# عرض الطابعات
+# =========================
+
 async def show_printers(update: Update):
+
     await update.message.reply_text(
         "🖨 قسم الطابعات\n\n"
         "👇 اختر الطابعة التي تريد إضافتها إلى السلة",
@@ -91,8 +116,10 @@ async def show_printers(update: Update):
     )
 
     for code, product in PRODUCTS.items():
+
         try:
             with open(product["image"], "rb") as photo:
+
                 await update.message.reply_photo(
                     photo=photo,
                     caption=(
@@ -100,8 +127,12 @@ async def show_printers(update: Update):
                         f"💰 السعر: {product['price']:,} دج"
                     ),
                 )
+
         except Exception as error:
-            print(f"Image error for {code}: {error}")
+
+            print(
+                f"Image error for {code}: {error}"
+            )
 
             await update.message.reply_text(
                 f"🖨 {product['name']}\n"
@@ -109,20 +140,30 @@ async def show_printers(update: Update):
             )
 
 
+# =========================
+# إضافة منتج للسلة
+# =========================
+
 async def add_product(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     product_code: str,
 ):
-    cart = context.user_data.setdefault("cart", {})
 
-    cart[product_code] = cart.get(product_code, 0) + 1
+    cart = context.user_data.setdefault(
+        "cart",
+        {}
+    )
+
+    cart[product_code] = (
+        cart.get(product_code, 0) + 1
+    )
 
     product = PRODUCTS[product_code]
     quantity = cart[product_code]
 
     await update.message.reply_text(
-        f"✅ تمت الإضافة إلى السلة\n\n"
+        "✅ تمت الإضافة إلى السلة\n\n"
         f"🖨 {product['name']}\n"
         f"💰 السعر: {product['price']:,} دج\n"
         f"🔢 الكمية في السلة: {quantity}",
@@ -130,25 +171,41 @@ async def add_product(
     )
 
 
+# =========================
+# عرض السلة
+# =========================
+
 async def show_cart(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
-    cart = context.user_data.get("cart", {})
+
+    cart = context.user_data.get(
+        "cart",
+        {}
+    )
 
     if not cart:
+
         await update.message.reply_text(
             "🛒 سلة المشتريات فارغة حالياً.",
             reply_markup=main_keyboard(),
         )
+
         return
 
     text = "🛒 سلة المشتريات\n\n"
+
     total = 0
 
     for code, quantity in cart.items():
+
         product = PRODUCTS[code]
-        subtotal = product["price"] * quantity
+
+        subtotal = (
+            product["price"] * quantity
+        )
+
         total += subtotal
 
         text += (
@@ -169,23 +226,37 @@ async def show_cart(
     )
 
 
+# =========================
+# تأكيد الطلب
+# =========================
+
 async def confirm_order(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
-    cart = context.user_data.get("cart", {})
+
+    cart = context.user_data.get(
+        "cart",
+        {}
+    )
 
     if not cart:
+
         await update.message.reply_text(
             "❌ لا يوجد أي منتج في السلة.",
             reply_markup=main_keyboard(),
         )
+
         return
 
     total = 0
 
     for code, quantity in cart.items():
-        total += PRODUCTS[code]["price"] * quantity
+
+        total += (
+            PRODUCTS[code]["price"]
+            * quantity
+        )
 
     await update.message.reply_text(
         "✅ تم تسجيل الطلب التجريبي بنجاح\n\n"
@@ -199,31 +270,68 @@ async def confirm_order(
     context.user_data["cart"] = {}
 
 
+# =========================
+# معالجة الأزرار
+# =========================
+
 async def buttons(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
+
     text = update.message.text
 
+    # الطابعات
     if text == "🖨 الطابعات":
+
         await show_printers(update)
 
+    # الرئيسية
     elif text == "🏠 الرئيسية":
-        await start(update, context)
 
+        await start(
+            update,
+            context,
+        )
+
+    # WF-C5390
     elif text == "🛒 EPSON WF-C5390":
-        await add_product(update, context, "WF-C5390")
 
+        await add_product(
+            update,
+            context,
+            "WF-C5390",
+        )
+
+    # WF-C5890
     elif text == "🛒 EPSON WF-C5890":
-        await add_product(update, context, "WF-C5890")
 
+        await add_product(
+            update,
+            context,
+            "WF-C5890",
+        )
+
+    # L15160
     elif text == "🛒 EPSON L15160":
-        await add_product(update, context, "L15160")
 
+        await add_product(
+            update,
+            context,
+            "L15160",
+        )
+
+    # السلة
     elif text == "🛒 السلة":
-        await show_cart(update, context)
 
+        await show_cart(
+            update,
+            context,
+        )
+
+    # تفريغ السلة
     elif text == "🗑 تفريغ السلة":
+
         context.user_data["cart"] = {}
 
         await update.message.reply_text(
@@ -231,66 +339,103 @@ async def buttons(
             reply_markup=main_keyboard(),
         )
 
+    # تأكيد الطلب
     elif text == "✅ تأكيد الطلب":
-        await confirm_order(update, context)
 
+        await confirm_order(
+            update,
+            context,
+        )
+
+    # الأحبار
     elif text == "🧴 الأحبار":
+
         await update.message.reply_text(
             "🧴 قسم الأحبار\n\n"
             "قريباً سنضيف أنواع الأحبار هنا.",
             reply_markup=main_keyboard(),
         )
 
+    # قطع الغيار
     elif text == "⚙️ قطع الغيار":
+
         await update.message.reply_text(
             "⚙️ قسم قطع الغيار\n\n"
             "قريباً سنضيف قطع الغيار هنا.",
             reply_markup=main_keyboard(),
         )
 
+    # طلباتي
     elif text == "📦 طلباتي":
+
         await update.message.reply_text(
             "📦 طلباتي\n\n"
             "لا توجد طلبات محفوظة حالياً.",
             reply_markup=main_keyboard(),
         )
 
+    # اتصل بنا
     elif text == "☎️ اتصل بنا":
+
         await update.message.reply_text(
             "☎️ اتصل بنا - GREENINK\n\n"
-            "📱 الهاتف الأول:\n"
-            "0560095387\n\n"
-            "📱 الهاتف الثاني:\n"
-            "0775635460\n\n"
+
+            "👤 أبوبكر\n"
+            "📱 0560095387\n\n"
+
+            "👤 عبد الحق\n"
+            "📱 0775635460\n\n"
+
             "🟢 نحن في خدمتكم.",
             reply_markup=main_keyboard(),
         )
 
+    # أي رسالة أخرى
     else:
+
         await update.message.reply_text(
             "👇 اختر أحد الأقسام من القائمة",
             reply_markup=main_keyboard(),
         )
 
 
-def main():
-    if not TOKEN:
-        raise RuntimeError("BOT_TOKEN is not configured")
+# =========================
+# تشغيل GREENINK BOT
+# =========================
 
-    app = Application.builder().token(TOKEN).build()
+def main():
+
+    if not TOKEN:
+
+        raise RuntimeError(
+            "BOT_TOKEN is not configured"
+        )
+
+    app = (
+        Application
+        .builder()
+        .token(TOKEN)
+        .build()
+    )
 
     app.add_handler(
-        CommandHandler("start", start)
+        CommandHandler(
+            "start",
+            start,
+        )
     )
 
     app.add_handler(
         MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
+            filters.TEXT
+            & ~filters.COMMAND,
             buttons,
         )
     )
 
-    print("GREENINK Bot is running...")
+    print(
+        "GREENINK Bot is running..."
+    )
 
     app.run_polling()
 
