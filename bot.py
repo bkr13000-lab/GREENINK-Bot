@@ -22,15 +22,17 @@ PRODUCTS = {
         "price": 195000,
         "image": "WF-C5390_headon_690x460.jpg",
     },
+
     "WF-C5890": {
         "name": "EPSON WF-C5890",
         "price": 220000,
         "image": "WF-C5890_headon_690x460.jpg",
     },
+
     "L15160": {
         "name": "EPSON L15160",
         "price": 210000,
-        "image": "L15160.png",
+        "image": "EPSON L15160.png",
     },
 }
 
@@ -135,13 +137,13 @@ async def show_printers(update: Update):
             )
 
             await update.message.reply_text(
-                f"🖨 {product['name']}\n"
+                f"🖨 {product['name']}\n\n"
                 f"💰 السعر: {product['price']:,} دج"
             )
 
 
 # =========================
-# إضافة منتج للسلة
+# إضافة للسلة
 # =========================
 
 async def add_product(
@@ -259,11 +261,9 @@ async def confirm_order(
         )
 
     await update.message.reply_text(
-        "✅ تم تسجيل الطلب التجريبي بنجاح\n\n"
+        "✅ تم تسجيل الطلب بنجاح\n\n"
         f"💰 إجمالي الطلب: {total:,} دج\n\n"
-        "📦 قريباً نضيف:\n"
-        "الاسم + رقم الهاتف + الولاية + العنوان\n"
-        "وإرسال الطلب مباشرة إلى إدارة GREENINK.",
+        "شكراً لاختياركم GREENINK 🟢",
         reply_markup=main_keyboard(),
     )
 
@@ -281,12 +281,10 @@ async def buttons(
 
     text = update.message.text
 
-    # الطابعات
     if text == "🖨 الطابعات":
 
         await show_printers(update)
 
-    # الرئيسية
     elif text == "🏠 الرئيسية":
 
         await start(
@@ -294,7 +292,6 @@ async def buttons(
             context,
         )
 
-    # WF-C5390
     elif text == "🛒 EPSON WF-C5390":
 
         await add_product(
@@ -303,7 +300,6 @@ async def buttons(
             "WF-C5390",
         )
 
-    # WF-C5890
     elif text == "🛒 EPSON WF-C5890":
 
         await add_product(
@@ -312,7 +308,6 @@ async def buttons(
             "WF-C5890",
         )
 
-    # L15160
     elif text == "🛒 EPSON L15160":
 
         await add_product(
@@ -321,7 +316,6 @@ async def buttons(
             "L15160",
         )
 
-    # السلة
     elif text == "🛒 السلة":
 
         await show_cart(
@@ -329,7 +323,6 @@ async def buttons(
             context,
         )
 
-    # تفريغ السلة
     elif text == "🗑 تفريغ السلة":
 
         context.user_data["cart"] = {}
@@ -339,7 +332,6 @@ async def buttons(
             reply_markup=main_keyboard(),
         )
 
-    # تأكيد الطلب
     elif text == "✅ تأكيد الطلب":
 
         await confirm_order(
@@ -347,7 +339,6 @@ async def buttons(
             context,
         )
 
-    # الأحبار
     elif text == "🧴 الأحبار":
 
         await update.message.reply_text(
@@ -356,7 +347,6 @@ async def buttons(
             reply_markup=main_keyboard(),
         )
 
-    # قطع الغيار
     elif text == "⚙️ قطع الغيار":
 
         await update.message.reply_text(
@@ -365,7 +355,6 @@ async def buttons(
             reply_markup=main_keyboard(),
         )
 
-    # طلباتي
     elif text == "📦 طلباتي":
 
         await update.message.reply_text(
@@ -374,7 +363,6 @@ async def buttons(
             reply_markup=main_keyboard(),
         )
 
-    # اتصل بنا
     elif text == "☎️ اتصل بنا":
 
         await update.message.reply_text(
@@ -390,7 +378,6 @@ async def buttons(
             reply_markup=main_keyboard(),
         )
 
-    # أي رسالة أخرى
     else:
 
         await update.message.reply_text(
@@ -400,13 +387,12 @@ async def buttons(
 
 
 # =========================
-# تشغيل GREENINK BOT
+# تشغيل البوت
 # =========================
 
 def main():
 
     if not TOKEN:
-
         raise RuntimeError(
             "BOT_TOKEN is not configured"
         )
@@ -427,15 +413,12 @@ def main():
 
     app.add_handler(
         MessageHandler(
-            filters.TEXT
-            & ~filters.COMMAND,
+            filters.TEXT & ~filters.COMMAND,
             buttons,
         )
     )
 
-    print(
-        "GREENINK Bot is running..."
-    )
+    print("GREENINK Bot is running...")
 
     app.run_polling()
 
