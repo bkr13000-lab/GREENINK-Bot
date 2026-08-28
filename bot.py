@@ -61,25 +61,36 @@ ADMIN_CHAT_IDS = load_admin_ids()
 # =========================================================
 
 PRODUCTS = {
+
+    # -----------------------------------------------------
+    # PRINTERS
+    # -----------------------------------------------------
+
     "WF-C5390": {
+        "category": "printer",
         "name": "EPSON WF-C5390",
         "price": 195000,
+        "description": "طابعة EPSON WF-C5390",
         "images": [
             "WF-C5390_headon_690x460.jpg",
         ],
     },
 
     "WF-C5890": {
+        "category": "printer",
         "name": "EPSON WF-C5890",
         "price": 220000,
+        "description": "طابعة EPSON WF-C5890",
         "images": [
             "WF-C5890_headon_690x460.jpg",
         ],
     },
 
     "L15160": {
+        "category": "printer",
         "name": "EPSON L15160",
         "price": 210000,
+        "description": "طابعة EPSON L15160",
         "images": [
             "EPSON L15160.jpg",
             "EPSON_L15160.jpg",
@@ -87,6 +98,27 @@ PRODUCTS = {
             "EPSON L15160.jpeg",
             "L15160.jpeg",
             "EPSON L15160.png",
+        ],
+    },
+
+    # -----------------------------------------------------
+    # INKS
+    # -----------------------------------------------------
+
+    "INK-5390-5890": {
+        "category": "ink",
+        "name": "GREENINK WF-C5390 / WF-C5890",
+        "price": 8000,
+        "description": (
+            "🧴 حبر GREENINK احترافي\n"
+            "⚖️ السعة: 1KG\n"
+            "✅ متوافق مع:\n"
+            "• EPSON WF-C5390\n"
+            "• EPSON WF-C5890"
+        ),
+        "images": [
+            "GREENINK_5390_5890_INK.png",
+            "GREENINK_5390_5890_INK.jpg",
         ],
     },
 }
@@ -431,10 +463,12 @@ def main_keyboard():
     )
 
 
-def printers_keyboard():
+def shop_keyboard():
     return ReplyKeyboardMarkup(
         [
-            ["🛒 السلة", "🏠 الرئيسية"],
+            ["🛒 السلة"],
+            ["🖨 الطابعات", "🧴 الأحبار"],
+            ["🏠 الرئيسية"],
         ],
         resize_keyboard=True,
     )
@@ -445,7 +479,8 @@ def cart_keyboard():
         [
             ["✅ تأكيد الطلب"],
             ["🗑 تفريغ السلة"],
-            ["🖨 الطابعات", "🏠 الرئيسية"],
+            ["🖨 الطابعات", "🧴 الأحبار"],
+            ["🏠 الرئيسية"],
         ],
         resize_keyboard=True,
     )
@@ -554,19 +589,32 @@ def calculate_cart(cart):
     total = 0
 
     for code, quantity in cart.items():
-        total += PRODUCTS[code]["price"] * quantity
+
+        product = PRODUCTS.get(code)
+
+        if product:
+            total += product["price"] * quantity
 
     return total
 
 
 def find_product_image(product):
     for image_name in product["images"]:
+
         path = Path(image_name)
 
         if path.exists():
             return path
 
     return None
+
+
+def build_product_caption(product):
+
+    return (
+        f"{product['description']}\n\n"
+        f"💰 السعر: {product['price']:,} دج"
+    )
 
 
 def build_admin_order_text(order):
@@ -593,6 +641,7 @@ def build_admin_order_text(order):
 
 
 def customer_status_message(order_number, status):
+
     if status == "✅ تم قبول الطلب":
         body = "✅ تم قبول طلبك من طرف GREENINK."
 
@@ -629,7 +678,11 @@ def customer_status_message(order_number, status):
 # START
 # =========================================================
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+
     context.user_data["step"] = None
 
     await update.message.reply_text(
@@ -641,7 +694,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def my_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def my_id(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+
     await update.message.reply_text(
         "🆔 Chat ID تاع هذا الحساب هو:\n\n"
         f"{update.effective_chat.id}"
@@ -649,26 +706,48 @@ async def my_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =========================================================
-# PRODUCTS
+# SHOW PRODUCTS
 # =========================================================
 
-async def show_printers(update: Update):
+async def show_category(
+    update: Update,
+    category,
+):
+
+    if category == "printer":
+
+        title = (
+            "🖨 قسم الطابعات\n\n"
+            "اختر الطابعة التي تريد 👇"
+        )
+
+    else:
+
+        title = (
+            "🧴 قسم الأحبار\n\n"
+            "اختر الحبر الذي تريد 👇"
+        )
+
     await update.message.reply_text(
-        "🖨 قسم الطابعات\n\n"
-        "اختر المنتج 👇",
-        reply_markup=printers_keyboard(),
+        title,
+        reply_markup=shop_keyboard(),
     )
+
+    found = False
 
     for code, product in PRODUCTS.items():
 
+        if product["category"] != category:
+            continue
+
+        found = True
+
         image_path = find_product_image(product)
 
-        caption = (
-            f"🖨 {product['name']}\n\n"
-            f"💰 السعر: {product['price']:,} دج"
-        )
+        caption = build_product_caption(product)
 
         if image_path:
+
             try:
 
                 with open(image_path, "rb") as photo:
@@ -698,9 +777,15 @@ async def show_printers(update: Update):
                 reply_markup=product_inline_keyboard(code),
             )
 
+    if not found:
+
+        await update.message.reply_text(
+            "لا توجد منتجات في هذا القسم حالياً."
+        )
+
 
 # =========================================================
-# DIRECT ORDER
+# DIRECT BUY
 # =========================================================
 
 async def start_direct_order_callback(
@@ -708,13 +793,16 @@ async def start_direct_order_callback(
     context,
     product_code,
 ):
+
     product = PRODUCTS.get(product_code)
 
     if not product:
+
         await query.answer(
             "❌ المنتج غير موجود",
             show_alert=True,
         )
+
         return
 
     context.user_data["cart"] = {
@@ -728,7 +816,7 @@ async def start_direct_order_callback(
 
     await query.message.reply_text(
         "🛍️ شراء مباشر\n\n"
-        f"🖨 {product['name']}\n"
+        f"{product['name']}\n"
         f"💰 {product['price']:,} دج\n\n"
         "👤 اكتب اسمك الكامل:"
     )
@@ -739,13 +827,16 @@ async def add_product_callback(
     context,
     product_code,
 ):
+
     product = PRODUCTS.get(product_code)
 
     if not product:
+
         await query.answer(
             "❌ المنتج غير موجود",
             show_alert=True,
         )
+
         return
 
     cart = context.user_data.setdefault(
@@ -763,8 +854,9 @@ async def add_product_callback(
 
     await query.message.reply_text(
         "🛒 تمت الإضافة للسلة\n\n"
-        f"🖨 {product['name']}\n"
-        f"🔢 الكمية: {cart[product_code]}"
+        f"📦 {product['name']}\n"
+        f"🔢 الكمية: {cart[product_code]}\n"
+        f"💰 السعر: {product['price']:,} دج"
     )
 
 
@@ -776,16 +868,19 @@ async def show_cart(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     cart = context.user_data.get(
         "cart",
         {},
     )
 
     if not cart:
+
         await update.message.reply_text(
             "🛒 سلة المشتريات فارغة حالياً.",
             reply_markup=main_keyboard(),
         )
+
         return
 
     text = "🛒 سلة المشتريات\n\n"
@@ -794,13 +889,16 @@ async def show_cart(
 
     for code, quantity in cart.items():
 
-        product = PRODUCTS[code]
+        product = PRODUCTS.get(code)
+
+        if not product:
+            continue
 
         subtotal = product["price"] * quantity
         total += subtotal
 
         text += (
-            f"🖨 {product['name']}\n"
+            f"📦 {product['name']}\n"
             f"💰 السعر: {product['price']:,} دج\n"
             f"🔢 الكمية: {quantity}\n"
             f"💵 المجموع: {subtotal:,} دج\n\n"
@@ -821,16 +919,19 @@ async def begin_order(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     cart = context.user_data.get(
         "cart",
         {},
     )
 
     if not cart:
+
         await update.message.reply_text(
             "❌ السلة فارغة.",
             reply_markup=main_keyboard(),
         )
+
         return
 
     context.user_data["direct_order"] = False
@@ -843,13 +944,14 @@ async def begin_order(
 
 
 # =========================================================
-# CUSTOMER INFO STEPS
+# CUSTOMER INFORMATION
 # =========================================================
 
 async def process_order_data(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     step = context.user_data.get("step")
 
     if not step:
@@ -857,13 +959,16 @@ async def process_order_data(
 
     text = update.message.text.strip()
 
+    # NAME
     if step == "name":
 
         if len(text) < 2:
+
             await update.message.reply_text(
-                "❌ الاسم قصير بزاف.\n"
+                "❌ الاسم قصير بزاف.\n\n"
                 "👤 اكتب اسمك الكامل:"
             )
+
             return True
 
         context.user_data["customer_name"] = text
@@ -875,6 +980,7 @@ async def process_order_data(
 
         return True
 
+    # PHONE
     if step == "phone":
 
         clean_phone = (
@@ -884,17 +990,21 @@ async def process_order_data(
         )
 
         if not clean_phone.isdigit():
+
             await update.message.reply_text(
                 "❌ رقم الهاتف لازم يكون أرقام فقط.\n\n"
                 "📱 اكتب رقم الهاتف:"
             )
+
             return True
 
         if len(clean_phone) < 9:
+
             await update.message.reply_text(
                 "❌ رقم الهاتف قصير.\n\n"
                 "📱 اكتب رقم الهاتف:"
             )
+
             return True
 
         context.user_data["customer_phone"] = clean_phone
@@ -906,13 +1016,16 @@ async def process_order_data(
 
         return True
 
+    # WILAYA
     if step == "wilaya":
 
         if len(text) < 2:
+
             await update.message.reply_text(
                 "❌ اسم الولاية غير صحيح.\n\n"
                 "📍 اكتب اسم الولاية:"
             )
+
             return True
 
         context.user_data["customer_wilaya"] = text
@@ -924,13 +1037,16 @@ async def process_order_data(
 
         return True
 
+    # ADDRESS
     if step == "address":
 
         if len(text) < 3:
+
             await update.message.reply_text(
                 "❌ العنوان قصير بزاف.\n\n"
                 "🏠 اكتب العنوان الكامل:"
             )
+
             return True
 
         context.user_data["customer_address"] = text
@@ -962,7 +1078,10 @@ async def process_order_data(
 
         for code, quantity in cart.items():
 
-            product = PRODUCTS[code]
+            product = PRODUCTS.get(code)
+
+            if not product:
+                continue
 
             summary += (
                 f"• {product['name']} "
@@ -986,13 +1105,14 @@ async def process_order_data(
 
 
 # =========================================================
-# ADMIN NOTIFICATIONS
+# ADMIN NOTIFICATION
 # =========================================================
 
 async def send_order_to_admins(
     context,
     order_number,
 ):
+
     if not ADMIN_CHAT_IDS:
 
         print(
@@ -1037,13 +1157,14 @@ async def send_order_to_admins(
 
 
 # =========================================================
-# FINAL CONFIRM
+# CONFIRM ORDER
 # =========================================================
 
 async def final_confirm(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     cart = context.user_data.get(
         "cart",
         {},
@@ -1110,6 +1231,7 @@ async def final_confirm(
     }
 
     try:
+
         save_order(order)
 
     except Exception as error:
@@ -1153,6 +1275,7 @@ async def show_orders(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     try:
 
         orders = get_customer_orders(
@@ -1218,6 +1341,7 @@ async def update_admin_messages(
     context,
     order_number,
 ):
+
     order = get_order(order_number)
 
     if not order:
@@ -1249,20 +1373,20 @@ async def update_admin_messages(
         except Exception as error:
 
             print(
-                f"Admin message update: "
-                f"{error}",
+                f"Admin message update: {error}",
                 flush=True,
             )
 
 
 # =========================================================
-# DELIVERY WITHOUT IMAGE
+# DELIVERY
 # =========================================================
 
 async def finish_delivery_without_image(
     context,
     order_number,
 ):
+
     order = get_order(order_number)
 
     if not order:
@@ -1279,9 +1403,7 @@ async def finish_delivery_without_image(
     )
 
     await context.bot.send_message(
-        chat_id=order[
-            "customer_chat_id"
-        ],
+        chat_id=order["customer_chat_id"],
         text=customer_status_message(
             order_number,
             "🚚 قيد التوصيل",
@@ -1290,19 +1412,21 @@ async def finish_delivery_without_image(
 
 
 # =========================================================
-# CALLBACK HANDLER
+# CALLBACKS
 # =========================================================
 
 async def callback_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     query = update.callback_query
 
     try:
 
-        action, value = (
-            query.data.split(":", 1)
+        action, value = query.data.split(
+            ":",
+            1,
         )
 
     except Exception:
@@ -1314,10 +1438,7 @@ async def callback_handler(
 
         return
 
-    # -------------------------------
-    # CUSTOMER PRODUCT ACTIONS
-    # -------------------------------
-
+    # CUSTOMER BUY
     if action == "buy":
 
         await start_direct_order_callback(
@@ -1328,6 +1449,7 @@ async def callback_handler(
 
         return
 
+    # CUSTOMER CART
     if action == "cart":
 
         await add_product_callback(
@@ -1338,10 +1460,7 @@ async def callback_handler(
 
         return
 
-    # -------------------------------
-    # ADMIN CHECK
-    # -------------------------------
-
+    # ADMIN SECURITY
     admin_id = query.from_user.id
 
     if admin_id not in ADMIN_CHAT_IDS:
@@ -1355,10 +1474,7 @@ async def callback_handler(
 
     order_number = value
 
-    # -------------------------------
-    # DELIVERY
-    # -------------------------------
-
+    # DELIVERY BUTTON
     if action == "delivery":
 
         order = get_order(
@@ -1380,8 +1496,7 @@ async def callback_handler(
             chat_id=admin_id,
             text=(
                 "🚚 تجهيز التوصيل\n\n"
-                f"🔢 الطلب: "
-                f"{order_number}\n\n"
+                f"🔢 الطلب: {order_number}\n\n"
                 "هل تريد إرسال صورة تتبع الطرد؟"
             ),
             reply_markup=delivery_photo_keyboard(
@@ -1440,10 +1555,6 @@ async def callback_handler(
         )
 
         return
-
-    # -------------------------------
-    # NORMAL ADMIN STATUSES
-    # -------------------------------
 
     order = get_order(
         order_number
@@ -1515,8 +1626,8 @@ async def callback_handler(
     except Exception as error:
 
         print(
-            f"Customer notification "
-            f"error: {error}",
+            f"Customer notification error: "
+            f"{error}",
             flush=True,
         )
 
@@ -1529,6 +1640,7 @@ async def handle_photo(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     admin_id = update.effective_user.id
 
     if admin_id not in ADMIN_CHAT_IDS:
@@ -1571,8 +1683,7 @@ async def handle_photo(
     except Exception as error:
 
         print(
-            f"Shipment image error: "
-            f"{error}",
+            f"Shipment image error: {error}",
             flush=True,
         )
 
@@ -1614,8 +1725,7 @@ async def handle_photo(
         photo=file_id,
         caption=(
             "📦 صورة تتبع الطرد\n\n"
-            f"🔢 رقم الطلب: "
-            f"{order_number}\n"
+            f"🔢 رقم الطلب: {order_number}\n"
             "🚚 طلبك راه قيد التوصيل.\n\n"
             "🟢 GREENINK"
         ),
@@ -1623,13 +1733,14 @@ async def handle_photo(
 
 
 # =========================================================
-# TEXT HANDLER
+# BUTTONS
 # =========================================================
 
 async def buttons(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     text = update.message.text
 
     step = context.user_data.get(
@@ -1643,11 +1754,9 @@ async def buttons(
         "address",
     ):
 
-        handled = (
-            await process_order_data(
-                update,
-                context,
-            )
+        handled = await process_order_data(
+            update,
+            context,
         )
 
         if handled:
@@ -1673,8 +1782,16 @@ async def buttons(
 
     elif text == "🖨 الطابعات":
 
-        await show_printers(
-            update
+        await show_category(
+            update,
+            "printer",
+        )
+
+    elif text == "🧴 الأحبار":
+
+        await show_category(
+            update,
+            "ink",
         )
 
     elif text == "🏠 الرئيسية":
@@ -1714,14 +1831,6 @@ async def buttons(
             context,
         )
 
-    elif text == "🧴 الأحبار":
-
-        await update.message.reply_text(
-            "🧴 قسم الأحبار\n\n"
-            "قريباً سنضيف المنتجات.",
-            reply_markup=main_keyboard(),
-        )
-
     elif text == "⚙️ قطع الغيار":
 
         await update.message.reply_text(
@@ -1745,8 +1854,7 @@ async def buttons(
     else:
 
         await update.message.reply_text(
-            "👇 اختر أحد الأقسام "
-            "من القائمة",
+            "👇 اختر أحد الأقسام من القائمة",
             reply_markup=main_keyboard(),
         )
 
@@ -1759,6 +1867,7 @@ async def error_handler(
     update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     print(
         "TELEGRAM ERROR:",
         repr(context.error),
@@ -1771,6 +1880,7 @@ async def error_handler(
 # =========================================================
 
 async def post_init(application):
+
     print(
         "Initializing PostgreSQL...",
         flush=True,
@@ -1783,15 +1893,14 @@ async def post_init(application):
         try:
 
             print(
-                f"PostgreSQL attempt "
-                f"{attempt}/3",
+                f"PostgreSQL attempt {attempt}/3",
                 flush=True,
             )
 
             init_database()
 
             print(
-                "PostgreSQL ready ✅",
+                "PostgreSQL database ready ✅",
                 flush=True,
             )
 
@@ -1823,6 +1932,7 @@ async def post_init(application):
 
 
 def main():
+
     print(
         "Starting GREENINK Bot...",
         flush=True,
