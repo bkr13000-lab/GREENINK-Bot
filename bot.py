@@ -17,9 +17,18 @@ from telegram.ext import (
     filters,
 )
 
+
+# ==========================================
+# إعدادات البوت
+# ==========================================
+
 TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
 
+
+# ==========================================
+# المنتجات
+# ==========================================
 
 PRODUCTS = {
     "WF-C5390": {
@@ -37,16 +46,20 @@ PRODUCTS = {
     "L15160": {
         "name": "EPSON L15160",
         "price": 210000,
-        "image": "EPSON_L15160.jpg",
+        "image": "EPSON L15160.png",
     },
 }
 
 
+# الطلبات أثناء تشغيل البوت
 ORDERS = {}
 
 
-def main_keyboard():
+# ==========================================
+# القوائم
+# ==========================================
 
+def main_keyboard():
     return ReplyKeyboardMarkup(
         [
             ["🖨 الطابعات", "🧴 الأحبار"],
@@ -58,7 +71,6 @@ def main_keyboard():
 
 
 def printers_keyboard():
-
     return ReplyKeyboardMarkup(
         [
             ["🛒 EPSON WF-C5390"],
@@ -71,7 +83,6 @@ def printers_keyboard():
 
 
 def cart_keyboard():
-
     return ReplyKeyboardMarkup(
         [
             ["✅ تأكيد الطلب"],
@@ -83,7 +94,6 @@ def cart_keyboard():
 
 
 def confirm_keyboard():
-
     return ReplyKeyboardMarkup(
         [
             ["✅ تأكيد نهائي"],
@@ -94,7 +104,6 @@ def confirm_keyboard():
 
 
 def admin_order_keyboard(order_number):
-
     return InlineKeyboardMarkup(
         [
             [
@@ -103,28 +112,24 @@ def admin_order_keyboard(order_number):
                     callback_data=f"accept:{order_number}",
                 )
             ],
-
             [
                 InlineKeyboardButton(
                     "📦 قيد التحضير",
                     callback_data=f"prepare:{order_number}",
                 )
             ],
-
             [
                 InlineKeyboardButton(
                     "🚚 قيد التوصيل",
                     callback_data=f"delivery:{order_number}",
                 )
             ],
-
             [
                 InlineKeyboardButton(
                     "✅ تم التسليم",
                     callback_data=f"done:{order_number}",
                 )
             ],
-
             [
                 InlineKeyboardButton(
                     "❌ إلغاء الطلب",
@@ -134,6 +139,10 @@ def admin_order_keyboard(order_number):
         ]
     )
 
+
+# ==========================================
+# /start
+# ==========================================
 
 async def start(
     update: Update,
@@ -149,6 +158,28 @@ async def start(
         reply_markup=main_keyboard(),
     )
 
+
+# ==========================================
+# /id
+# ==========================================
+
+async def my_id(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+
+    chat_id = update.effective_chat.id
+
+    await update.message.reply_text(
+        "🆔 Chat ID تاع هذا الحساب هو:\n\n"
+        f"{chat_id}\n\n"
+        "احتفظ بهذا الرقم."
+    )
+
+
+# ==========================================
+# عرض الطابعات
+# ==========================================
 
 async def show_printers(update: Update):
 
@@ -184,6 +215,10 @@ async def show_printers(update: Update):
             )
 
 
+# ==========================================
+# إضافة منتج للسلة
+# ==========================================
+
 async def add_product(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -210,6 +245,10 @@ async def add_product(
     )
 
 
+# ==========================================
+# حساب السلة
+# ==========================================
+
 def calculate_cart(cart):
 
     total = 0
@@ -223,6 +262,10 @@ def calculate_cart(cart):
 
     return total
 
+
+# ==========================================
+# عرض السلة
+# ==========================================
 
 async def show_cart(
     update: Update,
@@ -276,6 +319,10 @@ async def show_cart(
     )
 
 
+# ==========================================
+# بداية تأكيد الطلب
+# ==========================================
+
 async def begin_order(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -303,6 +350,10 @@ async def begin_order(
     )
 
 
+# ==========================================
+# بيانات الزبون
+# ==========================================
+
 async def process_order_data(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -311,7 +362,6 @@ async def process_order_data(
     step = context.user_data.get("step")
 
     if not step:
-
         return False
 
     text = update.message.text.strip()
@@ -363,12 +413,10 @@ async def process_order_data(
 
         summary = (
             "📦 مراجعة الطلب\n\n"
-
             f"👤 الاسم: {context.user_data['customer_name']}\n"
             f"📱 الهاتف: {context.user_data['customer_phone']}\n"
             f"📍 الولاية: {context.user_data['customer_wilaya']}\n"
             f"🏠 العنوان: {context.user_data['customer_address']}\n\n"
-
             "🛒 المنتجات:\n"
         )
 
@@ -396,6 +444,10 @@ async def process_order_data(
     return False
 
 
+# ==========================================
+# إرسال الطلب للمدير
+# ==========================================
+
 async def send_order_to_admin(
     context: ContextTypes.DEFAULT_TYPE,
     order,
@@ -421,30 +473,37 @@ async def send_order_to_admin(
 
     admin_text = (
         "🟢 طلب جديد - GREENINK\n\n"
-
         f"🔢 رقم الطلب: {order['number']}\n\n"
-
         f"👤 الاسم: {order['name']}\n"
         f"📱 الهاتف: {order['phone']}\n"
         f"📍 الولاية: {order['wilaya']}\n"
         f"🏠 العنوان: {order['address']}\n\n"
-
         "🛒 المنتجات:\n"
         f"{products_text}\n"
-
         f"💰 المجموع: {order['total']:,} دج\n\n"
-
         f"📦 الحالة: {order['status']}"
     )
 
-    await context.bot.send_message(
-        chat_id=int(ADMIN_CHAT_ID),
-        text=admin_text,
-        reply_markup=admin_order_keyboard(
-            order["number"]
-        ),
-    )
+    try:
 
+        await context.bot.send_message(
+            chat_id=int(ADMIN_CHAT_ID),
+            text=admin_text,
+            reply_markup=admin_order_keyboard(
+                order["number"]
+            ),
+        )
+
+    except Exception as error:
+
+        print(
+            f"Admin notification error: {error}"
+        )
+
+
+# ==========================================
+# التأكيد النهائي
+# ==========================================
 
 async def final_confirm(
     update: Update,
@@ -538,6 +597,10 @@ async def final_confirm(
     )
 
 
+# ==========================================
+# طلباتي
+# ==========================================
+
 async def show_orders(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -569,13 +632,12 @@ async def show_orders(
         )
 
         if not order:
-
             continue
 
         text += (
-            f"🔢 {order['number']}\n"
-            f"💰 {order['total']:,} دج\n"
-            f"📍 {order['wilaya']}\n"
+            f"🔢 رقم الطلب: {order['number']}\n"
+            f"💰 المبلغ: {order['total']:,} دج\n"
+            f"📍 الولاية: {order['wilaya']}\n"
             f"📦 الحالة: {order['status']}\n"
             "━━━━━━━━━━━━━━\n"
         )
@@ -585,6 +647,10 @@ async def show_orders(
         reply_markup=main_keyboard(),
     )
 
+
+# ==========================================
+# أزرار المدير
+# ==========================================
 
 async def admin_callback(
     update: Update,
@@ -634,12 +700,6 @@ async def admin_callback(
 
         order["status"] = "❌ تم إلغاء الطلب"
 
-    await query.edit_message_reply_markup(
-        reply_markup=admin_order_keyboard(
-            order_number
-        )
-    )
-
     await context.bot.send_message(
         chat_id=order["user_id"],
         text=(
@@ -650,6 +710,14 @@ async def admin_callback(
         ),
     )
 
+    await query.answer(
+        "تم تحديث حالة الطلب ✅"
+    )
+
+
+# ==========================================
+# معالجة الأزرار والرسائل
+# ==========================================
 
 async def buttons(
     update: Update,
@@ -689,7 +757,7 @@ async def buttons(
         context.user_data["step"] = None
 
         await update.message.reply_text(
-            "❌ تم إلغاء عملية تأكيد الطلب.\n"
+            "❌ تم إلغاء عملية تأكيد الطلب.\n\n"
             "السلة لم يتم حذفها.",
             reply_markup=main_keyboard(),
         )
@@ -780,11 +848,11 @@ async def buttons(
         await update.message.reply_text(
             "☎️ اتصل بنا - GREENINK\n\n"
 
-            "👤 أبوبكر\n"
-            "📱 0560095387\n\n"
+            "📱 0560095387\n"
+            "👤 أبوبكر\n\n"
 
-            "👤 عبد الحق\n"
-            "📱 0775635460\n\n"
+            "📱 0775635460\n"
+            "👤 عبد الحق\n\n"
 
             "🟢 نحن في خدمتكم.",
             reply_markup=main_keyboard(),
@@ -797,6 +865,10 @@ async def buttons(
             reply_markup=main_keyboard(),
         )
 
+
+# ==========================================
+# تشغيل البوت
+# ==========================================
 
 def main():
 
@@ -813,6 +885,7 @@ def main():
         .build()
     )
 
+    # /start
     app.add_handler(
         CommandHandler(
             "start",
@@ -820,12 +893,22 @@ def main():
         )
     )
 
+    # /id
+    app.add_handler(
+        CommandHandler(
+            "id",
+            my_id,
+        )
+    )
+
+    # أزرار المدير
     app.add_handler(
         CallbackQueryHandler(
             admin_callback
         )
     )
 
+    # رسائل المستخدم
     app.add_handler(
         MessageHandler(
             filters.TEXT
