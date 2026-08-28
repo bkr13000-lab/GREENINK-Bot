@@ -17,18 +17,20 @@ from telegram.ext import (
     filters,
 )
 
-
-# ==========================================
-# إعدادات البوت
-# ==========================================
-
 TOKEN = os.environ.get("BOT_TOKEN")
-ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
 
+ADMIN_CHAT_IDS_RAW = os.environ.get("ADMIN_CHAT_IDS", "")
 
-# ==========================================
-# المنتجات
-# ==========================================
+ADMIN_CHAT_IDS = []
+
+for item in ADMIN_CHAT_IDS_RAW.split(","):
+    item = item.strip()
+    if item:
+        try:
+            ADMIN_CHAT_IDS.append(int(item))
+        except ValueError:
+            pass
+
 
 PRODUCTS = {
     "WF-C5390": {
@@ -36,28 +38,21 @@ PRODUCTS = {
         "price": 195000,
         "image": "WF-C5390_headon_690x460.jpg",
     },
-
     "WF-C5890": {
         "name": "EPSON WF-C5890",
         "price": 220000,
         "image": "WF-C5890_headon_690x460.jpg",
     },
-
     "L15160": {
         "name": "EPSON L15160",
         "price": 210000,
-        "image": "EPSON L15160.png",
+        "image": "EPSON_L15160.jpg",
     },
 }
 
 
-# الطلبات أثناء تشغيل البوت
 ORDERS = {}
 
-
-# ==========================================
-# القوائم
-# ==========================================
 
 def main_keyboard():
     return ReplyKeyboardMarkup(
@@ -140,14 +135,7 @@ def admin_order_keyboard(order_number):
     )
 
 
-# ==========================================
-# /start
-# ==========================================
-
-async def start(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data["step"] = None
 
@@ -159,27 +147,15 @@ async def start(
     )
 
 
-# ==========================================
-# /id
-# ==========================================
-
-async def my_id(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-):
+async def my_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = update.effective_chat.id
 
     await update.message.reply_text(
         "🆔 Chat ID تاع هذا الحساب هو:\n\n"
-        f"{chat_id}\n\n"
-        "احتفظ بهذا الرقم."
+        f"{chat_id}"
     )
 
-
-# ==========================================
-# عرض الطابعات
-# ==========================================
 
 async def show_printers(update: Update):
 
@@ -192,9 +168,7 @@ async def show_printers(update: Update):
     for code, product in PRODUCTS.items():
 
         try:
-
             with open(product["image"], "rb") as photo:
-
                 await update.message.reply_photo(
                     photo=photo,
                     caption=(
@@ -205,9 +179,7 @@ async def show_printers(update: Update):
 
         except Exception as error:
 
-            print(
-                f"Image error for {code}: {error}"
-            )
+            print(f"Image error for {code}: {error}")
 
             await update.message.reply_text(
                 f"🖨 {product['name']}\n\n"
@@ -215,24 +187,15 @@ async def show_printers(update: Update):
             )
 
 
-# ==========================================
-# إضافة منتج للسلة
-# ==========================================
-
 async def add_product(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     product_code: str,
 ):
 
-    cart = context.user_data.setdefault(
-        "cart",
-        {},
-    )
+    cart = context.user_data.setdefault("cart", {})
 
-    cart[product_code] = (
-        cart.get(product_code, 0) + 1
-    )
+    cart[product_code] = cart.get(product_code, 0) + 1
 
     product = PRODUCTS[product_code]
 
@@ -245,60 +208,37 @@ async def add_product(
     )
 
 
-# ==========================================
-# حساب السلة
-# ==========================================
-
 def calculate_cart(cart):
 
     total = 0
 
     for code, quantity in cart.items():
-
-        total += (
-            PRODUCTS[code]["price"]
-            * quantity
-        )
+        total += PRODUCTS[code]["price"] * quantity
 
     return total
 
-
-# ==========================================
-# عرض السلة
-# ==========================================
 
 async def show_cart(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
 
-    cart = context.user_data.get(
-        "cart",
-        {},
-    )
+    cart = context.user_data.get("cart", {})
 
     if not cart:
-
         await update.message.reply_text(
             "🛒 سلة المشتريات فارغة حالياً.",
             reply_markup=main_keyboard(),
         )
-
         return
 
     text = "🛒 سلة المشتريات\n\n"
-
     total = 0
 
     for code, quantity in cart.items():
 
         product = PRODUCTS[code]
-
-        subtotal = (
-            product["price"]
-            * quantity
-        )
-
+        subtotal = product["price"] * quantity
         total += subtotal
 
         text += (
@@ -319,27 +259,18 @@ async def show_cart(
     )
 
 
-# ==========================================
-# بداية تأكيد الطلب
-# ==========================================
-
 async def begin_order(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
 
-    cart = context.user_data.get(
-        "cart",
-        {},
-    )
+    cart = context.user_data.get("cart", {})
 
     if not cart:
-
         await update.message.reply_text(
             "❌ السلة فارغة.",
             reply_markup=main_keyboard(),
         )
-
         return
 
     context.user_data["step"] = "name"
@@ -349,10 +280,6 @@ async def begin_order(
         "👤 أرسل اسمك الكامل:"
     )
 
-
-# ==========================================
-# بيانات الزبون
-# ==========================================
 
 async def process_order_data(
     update: Update,
@@ -404,11 +331,7 @@ async def process_order_data(
         context.user_data["customer_address"] = text
         context.user_data["step"] = "final_confirm"
 
-        cart = context.user_data.get(
-            "cart",
-            {},
-        )
-
+        cart = context.user_data.get("cart", {})
         total = calculate_cart(cart)
 
         summary = (
@@ -444,22 +367,7 @@ async def process_order_data(
     return False
 
 
-# ==========================================
-# إرسال الطلب للمدير
-# ==========================================
-
-async def send_order_to_admin(
-    context: ContextTypes.DEFAULT_TYPE,
-    order,
-):
-
-    if not ADMIN_CHAT_ID:
-
-        print(
-            "ADMIN_CHAT_ID is not configured"
-        )
-
-        return
+def build_admin_order_text(order):
 
     products_text = ""
 
@@ -471,7 +379,7 @@ async def send_order_to_admin(
             f"• {product['name']} × {quantity}\n"
         )
 
-    admin_text = (
+    return (
         "🟢 طلب جديد - GREENINK\n\n"
         f"🔢 رقم الطلب: {order['number']}\n\n"
         f"👤 الاسم: {order['name']}\n"
@@ -484,36 +392,53 @@ async def send_order_to_admin(
         f"📦 الحالة: {order['status']}"
     )
 
-    try:
 
-        await context.bot.send_message(
-            chat_id=int(ADMIN_CHAT_ID),
-            text=admin_text,
-            reply_markup=admin_order_keyboard(
-                order["number"]
-            ),
-        )
+async def send_order_to_admins(
+    context: ContextTypes.DEFAULT_TYPE,
+    order,
+):
 
-    except Exception as error:
+    if not ADMIN_CHAT_IDS:
+        print("ADMIN_CHAT_IDS is not configured")
+        return
 
-        print(
-            f"Admin notification error: {error}"
-        )
+    text = build_admin_order_text(order)
 
+    for admin_id in ADMIN_CHAT_IDS:
 
-# ==========================================
-# التأكيد النهائي
-# ==========================================
+        try:
+            message = await context.bot.send_message(
+                chat_id=admin_id,
+                text=text,
+                reply_markup=admin_order_keyboard(
+                    order["number"]
+                ),
+            )
+
+            order.setdefault(
+                "admin_messages",
+                []
+            ).append(
+                {
+                    "chat_id": admin_id,
+                    "message_id": message.message_id,
+                }
+            )
+
+        except Exception as error:
+
+            print(
+                f"Admin notification error "
+                f"{admin_id}: {error}"
+            )
+
 
 async def final_confirm(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
 
-    cart = context.user_data.get(
-        "cart",
-        {},
-    )
+    cart = context.user_data.get("cart", {})
 
     if not cart:
 
@@ -537,34 +462,27 @@ async def final_confirm(
 
     order = {
         "number": order_number,
-
         "user_id": update.effective_user.id,
-
         "name": context.user_data.get(
             "customer_name",
             "",
         ),
-
         "phone": context.user_data.get(
             "customer_phone",
             "",
         ),
-
         "wilaya": context.user_data.get(
             "customer_wilaya",
             "",
         ),
-
         "address": context.user_data.get(
             "customer_address",
             "",
         ),
-
         "cart": cart.copy(),
-
         "total": total,
-
         "status": "🟡 جديد",
+        "admin_messages": [],
     }
 
     ORDERS[order_number] = order
@@ -574,9 +492,7 @@ async def final_confirm(
         [],
     )
 
-    user_orders.append(
-        order_number
-    )
+    user_orders.append(order_number)
 
     context.user_data["cart"] = {}
     context.user_data["step"] = None
@@ -591,15 +507,11 @@ async def final_confirm(
         reply_markup=main_keyboard(),
     )
 
-    await send_order_to_admin(
+    await send_order_to_admins(
         context,
         order,
     )
 
-
-# ==========================================
-# طلباتي
-# ==========================================
 
 async def show_orders(
     update: Update,
@@ -627,9 +539,7 @@ async def show_orders(
         order_numbers[-10:]
     ):
 
-        order = ORDERS.get(
-            order_number
-        )
+        order = ORDERS.get(order_number)
 
         if not order:
             continue
@@ -648,9 +558,84 @@ async def show_orders(
     )
 
 
-# ==========================================
-# أزرار المدير
-# ==========================================
+def customer_status_message(
+    order_number,
+    status,
+):
+
+    if status == "✅ تم قبول الطلب":
+
+        body = (
+            "✅ تم قبول طلبك من طرف GREENINK."
+        )
+
+    elif status == "📦 قيد التحضير":
+
+        body = (
+            "📦 طلبك راه قيد التحضير حالياً."
+        )
+
+    elif status == "🚚 قيد التوصيل":
+
+        body = (
+            "🚚 طلبك خرج للتوصيل."
+        )
+
+    elif status == "✅ تم التسليم":
+
+        body = (
+            "✅ تم تسليم طلبك بنجاح.\n"
+            "شكراً لاختيارك GREENINK."
+        )
+
+    elif status == "❌ تم إلغاء الطلب":
+
+        body = (
+            "❌ تم إلغاء طلبك.\n"
+            "للمزيد من المعلومات تواصل معنا."
+        )
+
+    else:
+
+        body = (
+            f"📦 حالة طلبك أصبحت: {status}"
+        )
+
+    return (
+        "🔔 تحديث طلب GREENINK\n\n"
+        f"🔢 رقم الطلب: {order_number}\n\n"
+        f"{body}"
+    )
+
+
+async def update_admin_messages(
+    context: ContextTypes.DEFAULT_TYPE,
+    order,
+):
+
+    text = build_admin_order_text(order)
+
+    for item in order.get(
+        "admin_messages",
+        [],
+    ):
+
+        try:
+            await context.bot.edit_message_text(
+                chat_id=item["chat_id"],
+                message_id=item["message_id"],
+                text=text,
+                reply_markup=admin_order_keyboard(
+                    order["number"]
+                ),
+            )
+
+        except Exception as error:
+
+            print(
+                f"Admin message update error: {error}"
+            )
+
 
 async def admin_callback(
     update: Update,
@@ -659,17 +644,24 @@ async def admin_callback(
 
     query = update.callback_query
 
+    admin_id = query.from_user.id
+
+    if admin_id not in ADMIN_CHAT_IDS:
+
+        await query.answer(
+            "❌ غير مسموح لك بإدارة الطلبات",
+            show_alert=True,
+        )
+
+        return
+
     await query.answer()
 
-    data = query.data
-
     action, order_number = (
-        data.split(":", 1)
+        query.data.split(":", 1)
     )
 
-    order = ORDERS.get(
-        order_number
-    )
+    order = ORDERS.get(order_number)
 
     if not order:
 
@@ -682,31 +674,44 @@ async def admin_callback(
 
     if action == "accept":
 
-        order["status"] = "✅ تم قبول الطلب"
+        order["status"] = (
+            "✅ تم قبول الطلب"
+        )
 
     elif action == "prepare":
 
-        order["status"] = "📦 قيد التحضير"
+        order["status"] = (
+            "📦 قيد التحضير"
+        )
 
     elif action == "delivery":
 
-        order["status"] = "🚚 قيد التوصيل"
+        order["status"] = (
+            "🚚 قيد التوصيل"
+        )
 
     elif action == "done":
 
-        order["status"] = "✅ تم التسليم"
+        order["status"] = (
+            "✅ تم التسليم"
+        )
 
     elif action == "cancel":
 
-        order["status"] = "❌ تم إلغاء الطلب"
+        order["status"] = (
+            "❌ تم إلغاء الطلب"
+        )
+
+    await update_admin_messages(
+        context,
+        order,
+    )
 
     await context.bot.send_message(
         chat_id=order["user_id"],
-        text=(
-            "📦 تحديث حالة طلبك\n\n"
-            f"🔢 رقم الطلب: {order_number}\n"
-            f"📦 الحالة الجديدة: {order['status']}\n\n"
-            "🟢 GREENINK"
+        text=customer_status_message(
+            order_number,
+            order["status"],
         ),
     )
 
@@ -715,10 +720,6 @@ async def admin_callback(
     )
 
 
-# ==========================================
-# معالجة الأزرار والرسائل
-# ==========================================
-
 async def buttons(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -726,9 +727,7 @@ async def buttons(
 
     text = update.message.text
 
-    step = context.user_data.get(
-        "step"
-    )
+    step = context.user_data.get("step")
 
     if step in [
         "name",
@@ -847,13 +846,10 @@ async def buttons(
 
         await update.message.reply_text(
             "☎️ اتصل بنا - GREENINK\n\n"
-
-            "📱 0560095387\n"
-            "👤 أبوبكر\n\n"
-
-            "📱 0775635460\n"
-            "👤 عبد الحق\n\n"
-
+            "👤 أبوبكر\n"
+            "📱 0560095387\n\n"
+            "👤 عبد الحق\n"
+            "📱 0775635460\n\n"
             "🟢 نحن في خدمتكم.",
             reply_markup=main_keyboard(),
         )
@@ -866,14 +862,9 @@ async def buttons(
         )
 
 
-# ==========================================
-# تشغيل البوت
-# ==========================================
-
 def main():
 
     if not TOKEN:
-
         raise RuntimeError(
             "BOT_TOKEN is not configured"
         )
@@ -885,7 +876,6 @@ def main():
         .build()
     )
 
-    # /start
     app.add_handler(
         CommandHandler(
             "start",
@@ -893,7 +883,6 @@ def main():
         )
     )
 
-    # /id
     app.add_handler(
         CommandHandler(
             "id",
@@ -901,14 +890,12 @@ def main():
         )
     )
 
-    # أزرار المدير
     app.add_handler(
         CallbackQueryHandler(
             admin_callback
         )
     )
 
-    # رسائل المستخدم
     app.add_handler(
         MessageHandler(
             filters.TEXT
