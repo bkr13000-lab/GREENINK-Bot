@@ -1,5 +1,6 @@
 import os
 import random
+import time
 from pathlib import Path
 
 import psycopg
@@ -33,7 +34,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 def load_admin_ids():
     raw = os.environ.get("ADMIN_CHAT_IDS", "").strip()
 
-    # دعم المتغير القديم كذلك
+    # دعم المتغير القديم
     if not raw:
         raw = os.environ.get("ADMIN_CHAT_ID", "").strip()
 
@@ -48,7 +49,10 @@ def load_admin_ids():
         try:
             admins.append(int(item))
         except ValueError:
-            print(f"Invalid admin ID: {item}")
+            print(
+                f"Invalid admin ID: {item}",
+                flush=True,
+            )
 
     return admins
 
@@ -98,15 +102,35 @@ PRODUCTS = {
 
 def db_connect():
     if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL is not configured")
+        raise RuntimeError(
+            "DATABASE_URL is not configured"
+        )
 
-    return psycopg.connect(
+    print(
+        "Connecting to PostgreSQL...",
+        flush=True,
+    )
+
+    conn = psycopg.connect(
         DATABASE_URL,
         row_factory=dict_row,
+        connect_timeout=10,
     )
+
+    print(
+        "PostgreSQL connected ✅",
+        flush=True,
+    )
+
+    return conn
 
 
 def init_database():
+    print(
+        "Creating/checking PostgreSQL tables...",
+        flush=True,
+    )
+
     with db_connect() as conn:
         with conn.cursor() as cur:
 
@@ -132,9 +156,10 @@ def init_database():
                 """
                 CREATE TABLE IF NOT EXISTS order_items (
                     id BIGSERIAL PRIMARY KEY,
+
                     order_number VARCHAR(30) NOT NULL
-                        REFERENCES orders(order_number)
-                        ON DELETE CASCADE,
+                    REFERENCES orders(order_number)
+                    ON DELETE CASCADE,
 
                     product_code TEXT NOT NULL,
                     product_name TEXT NOT NULL,
@@ -148,8 +173,8 @@ def init_database():
                 """
                 CREATE TABLE IF NOT EXISTS admin_messages (
                     order_number VARCHAR(30) NOT NULL
-                        REFERENCES orders(order_number)
-                        ON DELETE CASCADE,
+                    REFERENCES orders(order_number)
+                    ON DELETE CASCADE,
 
                     admin_chat_id BIGINT NOT NULL,
                     message_id BIGINT NOT NULL,
@@ -165,21 +190,26 @@ def init_database():
 
             cur.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_orders_customer
+                CREATE INDEX IF NOT EXISTS
+                idx_orders_customer
                 ON orders(customer_chat_id);
                 """
             )
 
             cur.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_orders_created
+                CREATE INDEX IF NOT EXISTS
+                idx_orders_created
                 ON orders(created_at DESC);
                 """
             )
 
         conn.commit()
 
-    print("PostgreSQL database initialized successfully.")
+    print(
+        "PostgreSQL database initialized ✅",
+        flush=True,
+    )
 
 
 def order_exists(order_number):
@@ -483,7 +513,10 @@ def calculate_cart(cart):
     total = 0
 
     for code, quantity in cart.items():
-        total += PRODUCTS[code]["price"] * quantity
+        total += (
+            PRODUCTS[code]["price"]
+            * quantity
+        )
 
     return total
 
@@ -503,22 +536,37 @@ def build_admin_order_text(order):
     products_text = ""
 
     for item in order["items"]:
+
         products_text += (
-            f"• {item['product_name']} × "
-            f"{item['quantity']}\n"
+            f"• {item['product_name']} "
+            f"× {item['quantity']}\n"
         )
 
     return (
         "🟢 طلب جديد - GREENINK\n\n"
-        f"🔢 رقم الطلب: {order['order_number']}\n\n"
-        f"👤 الاسم: {order['customer_name']}\n"
-        f"📱 الهاتف: {order['phone']}\n"
-        f"📍 الولاية: {order['wilaya']}\n"
-        f"🏠 العنوان: {order['address']}\n\n"
+        f"🔢 رقم الطلب: "
+        f"{order['order_number']}\n\n"
+
+        f"👤 الاسم: "
+        f"{order['customer_name']}\n"
+
+        f"📱 الهاتف: "
+        f"{order['phone']}\n"
+
+        f"📍 الولاية: "
+        f"{order['wilaya']}\n"
+
+        f"🏠 العنوان: "
+        f"{order['address']}\n\n"
+
         "🛒 المنتجات:\n"
         f"{products_text}\n"
-        f"💰 المجموع: {order['total']:,} دج\n\n"
-        f"📦 الحالة: {order['status']}"
+
+        f"💰 المجموع: "
+        f"{order['total']:,} دج\n\n"
+
+        f"📦 الحالة: "
+        f"{order['status']}"
     )
 
 
@@ -529,13 +577,15 @@ def customer_status_message(
     if status == "✅ تم قبول الطلب":
 
         body = (
-            "✅ تم قبول طلبك من طرف GREENINK."
+            "✅ تم قبول طلبك "
+            "من طرف GREENINK."
         )
 
     elif status == "📦 قيد التحضير":
 
         body = (
-            "📦 طلبك راه قيد التحضير حالياً."
+            "📦 طلبك راه قيد "
+            "التحضير حالياً."
         )
 
     elif status == "🚚 قيد التوصيل":
@@ -555,19 +605,24 @@ def customer_status_message(
 
         body = (
             "❌ تم إلغاء طلبك.\n\n"
-            "للمزيد من المعلومات تواصل معنا."
+            "للمزيد من المعلومات "
+            "تواصل معنا."
         )
 
     else:
 
         body = (
-            f"📦 حالة طلبك أصبحت:\n{status}"
+            f"📦 حالة طلبك أصبحت:\n"
+            f"{status}"
         )
 
     return (
         "🔔 تحديث طلب GREENINK\n\n"
-        f"🔢 رقم الطلب: {order_number}\n\n"
+        f"🔢 رقم الطلب: "
+        f"{order_number}\n\n"
+
         f"{body}\n\n"
+
         "🟢 GREENINK"
     )
 
@@ -610,18 +665,24 @@ async def my_id(
 async def show_printers(update: Update):
     await update.message.reply_text(
         "🖨 قسم الطابعات\n\n"
-        "👇 اختر الطابعة التي تريد إضافتها للسلة",
+        "👇 اختر الطابعة التي تريد "
+        "إضافتها للسلة",
         reply_markup=printers_keyboard(),
     )
 
     for code, product in PRODUCTS.items():
 
-        image_path = find_product_image(product)
+        image_path = find_product_image(
+            product
+        )
 
         if image_path:
 
             try:
-                with open(image_path, "rb") as photo:
+                with open(
+                    image_path,
+                    "rb",
+                ) as photo:
 
                     await update.message.reply_photo(
                         photo=photo,
@@ -633,9 +694,17 @@ async def show_printers(update: Update):
                     )
 
             except Exception as error:
+
                 print(
                     f"Image error for "
-                    f"{code}: {error}"
+                    f"{code}: {error}",
+                    flush=True,
+                )
+
+                await update.message.reply_text(
+                    f"🖨 {product['name']}\n\n"
+                    f"💰 السعر: "
+                    f"{product['price']:,} دج"
                 )
 
         else:
@@ -666,8 +735,10 @@ async def add_product(
     await update.message.reply_text(
         "✅ تمت الإضافة إلى السلة\n\n"
         f"🖨 {product['name']}\n"
-        f"💰 السعر: {product['price']:,} دج\n"
-        f"🔢 الكمية: {cart[product_code]}",
+        f"💰 السعر: "
+        f"{product['price']:,} دج\n"
+        f"🔢 الكمية: "
+        f"{cart[product_code]}",
         reply_markup=printers_keyboard(),
     )
 
@@ -688,7 +759,8 @@ async def show_cart(
     if not cart:
 
         await update.message.reply_text(
-            "🛒 سلة المشتريات فارغة حالياً.",
+            "🛒 سلة المشتريات "
+            "فارغة حالياً.",
             reply_markup=main_keyboard(),
         )
 
@@ -703,7 +775,8 @@ async def show_cart(
         product = PRODUCTS[code]
 
         subtotal = (
-            product["price"] * quantity
+            product["price"]
+            * quantity
         )
 
         total += subtotal
@@ -712,7 +785,8 @@ async def show_cart(
             f"🖨 {product['name']}\n"
             f"💰 السعر: "
             f"{product['price']:,} دج\n"
-            f"🔢 الكمية: {quantity}\n"
+            f"🔢 الكمية: "
+            f"{quantity}\n"
             f"💵 المجموع: "
             f"{subtotal:,} دج\n\n"
         )
@@ -776,7 +850,9 @@ async def process_order_data(
             "customer_name"
         ] = text
 
-        context.user_data["step"] = "phone"
+        context.user_data[
+            "step"
+        ] = "phone"
 
         await update.message.reply_text(
             "📱 أرسل رقم الهاتف:"
@@ -790,7 +866,9 @@ async def process_order_data(
             "customer_phone"
         ] = text
 
-        context.user_data["step"] = "wilaya"
+        context.user_data[
+            "step"
+        ] = "wilaya"
 
         await update.message.reply_text(
             "📍 أرسل اسم الولاية:"
@@ -804,7 +882,9 @@ async def process_order_data(
             "customer_wilaya"
         ] = text
 
-        context.user_data["step"] = "address"
+        context.user_data[
+            "step"
+        ] = "address"
 
         await update.message.reply_text(
             "🏠 أرسل العنوان الكامل:"
@@ -831,14 +911,19 @@ async def process_order_data(
 
         summary = (
             "📦 مراجعة الطلب\n\n"
+
             f"👤 الاسم: "
             f"{context.user_data['customer_name']}\n"
+
             f"📱 الهاتف: "
             f"{context.user_data['customer_phone']}\n"
+
             f"📍 الولاية: "
             f"{context.user_data['customer_wilaya']}\n"
+
             f"🏠 العنوان: "
             f"{context.user_data['customer_address']}\n\n"
+
             "🛒 المنتجات:\n"
         )
 
@@ -855,6 +940,7 @@ async def process_order_data(
             "\n━━━━━━━━━━━━━━\n"
             f"💰 المجموع: "
             f"{total:,} دج\n\n"
+
             "هل تؤكد الطلب؟"
         )
 
@@ -880,7 +966,8 @@ async def send_order_to_admins(
 
         print(
             "ADMIN_CHAT_IDS "
-            "is not configured"
+            "is not configured",
+            flush=True,
         )
 
         return
@@ -896,12 +983,14 @@ async def send_order_to_admins(
 
         try:
 
-            message = await context.bot.send_message(
-                chat_id=admin_id,
-                text=text,
-                reply_markup=admin_order_keyboard(
-                    order_number
-                ),
+            message = (
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=text,
+                    reply_markup=admin_order_keyboard(
+                        order_number
+                    ),
+                )
             )
 
             save_admin_message(
@@ -914,7 +1003,8 @@ async def send_order_to_admins(
 
             print(
                 f"Admin notification error "
-                f"{admin_id}: {error}"
+                f"{admin_id}: {error}",
+                flush=True,
             )
 
 
@@ -940,15 +1030,34 @@ async def final_confirm(
 
         return
 
-    while True:
+    try:
 
-        order_number = (
-            f"GR-"
-            f"{random.randint(100000, 999999)}"
+        while True:
+
+            order_number = (
+                f"GR-"
+                f"{random.randint(100000, 999999)}"
+            )
+
+            if not order_exists(
+                order_number
+            ):
+                break
+
+    except Exception as error:
+
+        print(
+            f"Database order number "
+            f"error: {error}",
+            flush=True,
         )
 
-        if not order_exists(order_number):
-            break
+        await update.message.reply_text(
+            "❌ تعذر الاتصال بقاعدة "
+            "البيانات حالياً."
+        )
+
+        return
 
     total = calculate_cart(cart)
 
@@ -956,22 +1065,27 @@ async def final_confirm(
         "number": order_number,
         "chat_id": update.effective_chat.id,
         "user_id": update.effective_user.id,
+
         "name": context.user_data.get(
             "customer_name",
             "",
         ),
+
         "phone": context.user_data.get(
             "customer_phone",
             "",
         ),
+
         "wilaya": context.user_data.get(
             "customer_wilaya",
             "",
         ),
+
         "address": context.user_data.get(
             "customer_address",
             "",
         ),
+
         "cart": cart.copy(),
         "total": total,
         "status": "🟡 جديد",
@@ -985,7 +1099,8 @@ async def final_confirm(
 
         print(
             f"Database order save error: "
-            f"{error}"
+            f"{error}",
+            flush=True,
         )
 
         await update.message.reply_text(
@@ -1000,10 +1115,17 @@ async def final_confirm(
 
     await update.message.reply_text(
         "✅ تم تأكيد طلبك بنجاح\n\n"
-        f"🔢 رقم الطلب: {order_number}\n"
-        f"💰 المجموع: {total:,} دج\n"
+
+        f"🔢 رقم الطلب: "
+        f"{order_number}\n"
+
+        f"💰 المجموع: "
+        f"{total:,} دج\n"
+
         "📦 الحالة: جديد\n\n"
+
         "احتفظ برقم الطلب للمتابعة.\n\n"
+
         "🟢 GREENINK",
         reply_markup=main_keyboard(),
     )
@@ -1034,11 +1156,14 @@ async def show_orders(
     except Exception as error:
 
         print(
-            f"Get orders error: {error}"
+            f"Get orders error: "
+            f"{error}",
+            flush=True,
         )
 
         await update.message.reply_text(
-            "❌ تعذر تحميل الطلبات حالياً."
+            "❌ تعذر تحميل الطلبات حالياً.",
+            reply_markup=main_keyboard(),
         )
 
         return
@@ -1060,12 +1185,16 @@ async def show_orders(
         text += (
             f"🔢 رقم الطلب: "
             f"{order['order_number']}\n"
+
             f"💰 المبلغ: "
             f"{order['total']:,} دج\n"
+
             f"📍 الولاية: "
             f"{order['wilaya']}\n"
+
             f"📦 الحالة: "
             f"{order['status']}\n"
+
             "━━━━━━━━━━━━━━\n"
         )
 
@@ -1102,10 +1231,13 @@ async def update_admin_messages(
                 chat_id=item[
                     "admin_chat_id"
                 ],
+
                 message_id=item[
                     "message_id"
                 ],
+
                 text=text,
+
                 reply_markup=admin_order_keyboard(
                     order_number
                 ),
@@ -1113,11 +1245,10 @@ async def update_admin_messages(
 
         except Exception as error:
 
-            # إذا الرسالة أصلاً بنفس النص
-            # Telegram قد يرجع Message is not modified
             print(
                 "Admin message update: "
-                f"{error}"
+                f"{error}",
+                flush=True,
             )
 
 
@@ -1136,16 +1267,19 @@ async def admin_callback(
     if admin_id not in ADMIN_CHAT_IDS:
 
         await query.answer(
-            "❌ غير مسموح لك بإدارة الطلبات",
+            "❌ غير مسموح لك "
+            "بإدارة الطلبات",
             show_alert=True,
         )
 
         return
 
     try:
+
         action, order_number = (
             query.data.split(":", 1)
         )
+
     except Exception:
 
         await query.answer(
@@ -1155,7 +1289,27 @@ async def admin_callback(
 
         return
 
-    order = get_order(order_number)
+    try:
+
+        order = get_order(
+            order_number
+        )
+
+    except Exception as error:
+
+        print(
+            f"Get admin order error: "
+            f"{error}",
+            flush=True,
+        )
+
+        await query.answer(
+            "❌ تعذر الاتصال "
+            "بقاعدة البيانات",
+            show_alert=True,
+        )
+
+        return
 
     if not order:
 
@@ -1188,24 +1342,52 @@ async def admin_callback(
     if order["status"] == new_status:
 
         await query.answer(
-            "الحالة راهي محدثة من قبل ✅"
+            "الحالة راهي "
+            "محدثة من قبل ✅"
         )
 
         return
 
-    update_order_status(
-        order_number,
-        new_status,
-    )
+    try:
+
+        update_order_status(
+            order_number,
+            new_status,
+        )
+
+    except Exception as error:
+
+        print(
+            f"Status database error: "
+            f"{error}",
+            flush=True,
+        )
+
+        await query.answer(
+            "❌ خطأ في تحديث الطلب",
+            show_alert=True,
+        )
+
+        return
 
     await query.answer(
         "تم تحديث حالة الطلب ✅"
     )
 
-    await update_admin_messages(
-        context,
-        order_number,
-    )
+    try:
+
+        await update_admin_messages(
+            context,
+            order_number,
+        )
+
+    except Exception as error:
+
+        print(
+            f"Admin messages update "
+            f"error: {error}",
+            flush=True,
+        )
 
     try:
 
@@ -1213,6 +1395,7 @@ async def admin_callback(
             chat_id=order[
                 "customer_chat_id"
             ],
+
             text=customer_status_message(
                 order_number,
                 new_status,
@@ -1223,7 +1406,8 @@ async def admin_callback(
 
         print(
             "Customer notification "
-            f"error: {error}"
+            f"error: {error}",
+            flush=True,
         )
 
 
@@ -1237,4 +1421,298 @@ async def buttons(
 ):
     text = update.message.text
 
-    step = context.user
+    step = context.user_data.get("step")
+
+    if step in [
+        "name",
+        "phone",
+        "wilaya",
+        "address",
+    ]:
+
+        handled = (
+            await process_order_data(
+                update,
+                context,
+            )
+        )
+
+        if handled:
+            return
+
+    if text == "✅ تأكيد نهائي":
+
+        await final_confirm(
+            update,
+            context,
+        )
+
+    elif text == "❌ إلغاء الطلب":
+
+        context.user_data["step"] = None
+
+        await update.message.reply_text(
+            "❌ تم إلغاء عملية "
+            "تأكيد الطلب.\n\n"
+            "السلة لم يتم حذفها.",
+            reply_markup=main_keyboard(),
+        )
+
+    elif text == "🖨 الطابعات":
+
+        await show_printers(update)
+
+    elif text == "🏠 الرئيسية":
+
+        await start(
+            update,
+            context,
+        )
+
+    elif text == "🛒 EPSON WF-C5390":
+
+        await add_product(
+            update,
+            context,
+            "WF-C5390",
+        )
+
+    elif text == "🛒 EPSON WF-C5890":
+
+        await add_product(
+            update,
+            context,
+            "WF-C5890",
+        )
+
+    elif text == "🛒 EPSON L15160":
+
+        await add_product(
+            update,
+            context,
+            "L15160",
+        )
+
+    elif text == "🛒 السلة":
+
+        await show_cart(
+            update,
+            context,
+        )
+
+    elif text == "✅ تأكيد الطلب":
+
+        await begin_order(
+            update,
+            context,
+        )
+
+    elif text == "🗑 تفريغ السلة":
+
+        context.user_data["cart"] = {}
+
+        await update.message.reply_text(
+            "🗑 تم تفريغ السلة.",
+            reply_markup=main_keyboard(),
+        )
+
+    elif text == "📦 طلباتي":
+
+        await show_orders(
+            update,
+            context,
+        )
+
+    elif text == "🧴 الأحبار":
+
+        await update.message.reply_text(
+            "🧴 قسم الأحبار\n\n"
+            "قريباً سنضيف أنواع "
+            "الأحبار هنا.",
+            reply_markup=main_keyboard(),
+        )
+
+    elif text == "⚙️ قطع الغيار":
+
+        await update.message.reply_text(
+            "⚙️ قسم قطع الغيار\n\n"
+            "قريباً سنضيف قطع "
+            "الغيار هنا.",
+            reply_markup=main_keyboard(),
+        )
+
+    elif text == "☎️ اتصل بنا":
+
+        await update.message.reply_text(
+            "☎️ اتصل بنا - GREENINK\n\n"
+
+            "📱 0560095387\n"
+            "أبوبكر\n\n"
+
+            "📱 0775635460\n"
+            "عبد الحق\n\n"
+
+            "🟢 نحن في خدمتكم.",
+            reply_markup=main_keyboard(),
+        )
+
+    else:
+
+        await update.message.reply_text(
+            "👇 اختر أحد الأقسام "
+            "من القائمة",
+            reply_markup=main_keyboard(),
+        )
+
+
+# =========================================================
+# ERRORS
+# =========================================================
+
+async def error_handler(
+    update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    print(
+        "TELEGRAM ERROR:",
+        repr(context.error),
+        flush=True,
+    )
+
+
+# =========================================================
+# STARTUP
+# =========================================================
+
+async def post_init(application):
+    print(
+        "Initializing PostgreSQL...",
+        flush=True,
+    )
+
+    last_error = None
+
+    # نحاول 3 مرات فقط
+    for attempt in range(1, 4):
+
+        try:
+
+            print(
+                f"PostgreSQL attempt "
+                f"{attempt}/3",
+                flush=True,
+            )
+
+            init_database()
+
+            print(
+                "PostgreSQL database ready ✅",
+                flush=True,
+            )
+
+            last_error = None
+            break
+
+        except Exception as error:
+
+            last_error = error
+
+            print(
+                f"POSTGRES ERROR: "
+                f"{type(error).__name__}: "
+                f"{error}",
+                flush=True,
+            )
+
+            if attempt < 3:
+                print(
+                    "Retrying PostgreSQL "
+                    "in 3 seconds...",
+                    flush=True,
+                )
+
+                time.sleep(3)
+
+    if last_error is not None:
+        raise last_error
+
+    print(
+        f"Admins loaded: "
+        f"{len(ADMIN_CHAT_IDS)}",
+        flush=True,
+    )
+
+
+def main():
+    print(
+        "Starting GREENINK Bot...",
+        flush=True,
+    )
+
+    if not TOKEN:
+        raise RuntimeError(
+            "BOT_TOKEN is not configured"
+        )
+
+    if not DATABASE_URL:
+        raise RuntimeError(
+            "DATABASE_URL is not configured"
+        )
+
+    print(
+        "Environment variables OK ✅",
+        flush=True,
+    )
+
+    app = (
+        Application
+        .builder()
+        .token(TOKEN)
+        .post_init(post_init)
+        .build()
+    )
+
+    app.add_handler(
+        CommandHandler(
+            "start",
+            start,
+        )
+    )
+
+    app.add_handler(
+        CommandHandler(
+            "id",
+            my_id,
+        )
+    )
+
+    app.add_handler(
+        CallbackQueryHandler(
+            admin_callback
+        )
+    )
+
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT
+            & ~filters.COMMAND,
+            buttons,
+        )
+    )
+
+    app.add_error_handler(
+        error_handler
+    )
+
+    print(
+        "Telegram polling starting...",
+        flush=True,
+    )
+
+    app.run_polling(
+        drop_pending_updates=True
+    )
+
+
+if __name__ == "__main__":
+    main()
