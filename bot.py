@@ -47,12 +47,8 @@ def load_admin_ids():
 
         try:
             admins.append(int(item))
-
         except ValueError:
-            print(
-                f"Invalid admin ID: {item}",
-                flush=True,
-            )
+            print(f"Invalid admin ID: {item}", flush=True)
 
     return admins
 
@@ -102,9 +98,7 @@ PRODUCTS = {
 
 def db_connect():
     if not DATABASE_URL:
-        raise RuntimeError(
-            "DATABASE_URL is not configured"
-        )
+        raise RuntimeError("DATABASE_URL is not configured")
 
     return psycopg.connect(
         DATABASE_URL,
@@ -114,10 +108,7 @@ def db_connect():
 
 
 def init_database():
-    print(
-        "Creating/checking PostgreSQL tables...",
-        flush=True,
-    )
+    print("Creating/checking PostgreSQL tables...", flush=True)
 
     with db_connect() as conn:
         with conn.cursor() as cur:
@@ -126,27 +117,17 @@ def init_database():
                 """
                 CREATE TABLE IF NOT EXISTS orders (
                     order_number VARCHAR(30) PRIMARY KEY,
-
                     customer_chat_id BIGINT NOT NULL,
                     customer_user_id BIGINT,
-
                     customer_name TEXT NOT NULL,
                     phone TEXT NOT NULL,
                     wilaya TEXT NOT NULL,
                     address TEXT NOT NULL,
-
                     total BIGINT NOT NULL,
-
-                    status TEXT NOT NULL
-                    DEFAULT '🟡 جديد',
-
+                    status TEXT NOT NULL DEFAULT '🟡 جديد',
                     shipment_image_file_id TEXT,
-
-                    created_at TIMESTAMPTZ
-                    NOT NULL DEFAULT NOW(),
-
-                    updated_at TIMESTAMPTZ
-                    NOT NULL DEFAULT NOW()
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 );
                 """
             )
@@ -164,14 +145,12 @@ def init_database():
                 CREATE TABLE IF NOT EXISTS order_items (
                     id BIGSERIAL PRIMARY KEY,
 
-                    order_number VARCHAR(30)
-                    NOT NULL
+                    order_number VARCHAR(30) NOT NULL
                     REFERENCES orders(order_number)
                     ON DELETE CASCADE,
 
                     product_code TEXT NOT NULL,
                     product_name TEXT NOT NULL,
-
                     quantity INTEGER NOT NULL,
                     unit_price BIGINT NOT NULL
                 );
@@ -181,8 +160,7 @@ def init_database():
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS admin_messages (
-                    order_number VARCHAR(30)
-                    NOT NULL
+                    order_number VARCHAR(30) NOT NULL
                     REFERENCES orders(order_number)
                     ON DELETE CASCADE,
 
@@ -216,10 +194,7 @@ def init_database():
 
         conn.commit()
 
-    print(
-        "PostgreSQL database initialized ✅",
-        flush=True,
-    )
+    print("PostgreSQL database initialized ✅", flush=True)
 
 
 def order_exists(order_number):
@@ -300,11 +275,7 @@ def save_order(order):
         conn.commit()
 
 
-def save_admin_message(
-    order_number,
-    admin_chat_id,
-    message_id,
-):
+def save_admin_message(order_number, admin_chat_id, message_id):
     with db_connect() as conn:
         with conn.cursor() as cur:
 
@@ -382,10 +353,7 @@ def get_order(order_number):
     return order
 
 
-def get_customer_orders(
-    chat_id,
-    limit=10,
-):
+def get_customer_orders(chat_id, limit=10):
     with db_connect() as conn:
         with conn.cursor() as cur:
 
@@ -406,10 +374,7 @@ def get_customer_orders(
             return cur.fetchall()
 
 
-def update_order_status(
-    order_number,
-    new_status,
-):
+def update_order_status(order_number, new_status):
     with db_connect() as conn:
         with conn.cursor() as cur:
 
@@ -430,10 +395,7 @@ def update_order_status(
         conn.commit()
 
 
-def save_shipment_image(
-    order_number,
-    file_id,
-):
+def save_shipment_image(order_number, file_id):
     with db_connect() as conn:
         with conn.cursor() as cur:
 
@@ -455,7 +417,7 @@ def save_shipment_image(
 
 
 # =========================================================
-# MAIN KEYBOARDS
+# KEYBOARDS
 # =========================================================
 
 def main_keyboard():
@@ -499,10 +461,6 @@ def confirm_keyboard():
     )
 
 
-# =========================================================
-# PRODUCT INLINE BUTTONS
-# =========================================================
-
 def product_inline_keyboard(product_code):
     return InlineKeyboardMarkup(
         [
@@ -519,10 +477,6 @@ def product_inline_keyboard(product_code):
         ]
     )
 
-
-# =========================================================
-# ADMIN INLINE BUTTONS
-# =========================================================
 
 def admin_order_keyboard(order_number):
     return InlineKeyboardMarkup(
@@ -567,37 +521,25 @@ def delivery_photo_keyboard(order_number):
             [
                 InlineKeyboardButton(
                     "📷 تصوير الوصل",
-                    callback_data=(
-                        f"delivery_camera:"
-                        f"{order_number}"
-                    ),
+                    callback_data=f"delivery_camera:{order_number}",
                 )
             ],
             [
                 InlineKeyboardButton(
                     "🖼️ اختيار صورة",
-                    callback_data=(
-                        f"delivery_gallery:"
-                        f"{order_number}"
-                    ),
+                    callback_data=f"delivery_gallery:{order_number}",
                 )
             ],
             [
                 InlineKeyboardButton(
                     "⏭️ بدون صورة",
-                    callback_data=(
-                        f"delivery_skip:"
-                        f"{order_number}"
-                    ),
+                    callback_data=f"delivery_skip:{order_number}",
                 )
             ],
             [
                 InlineKeyboardButton(
                     "❌ إلغاء",
-                    callback_data=(
-                        f"delivery_cancel:"
-                        f"{order_number}"
-                    ),
+                    callback_data=f"delivery_cancel:{order_number}",
                 )
             ],
         ]
@@ -612,18 +554,13 @@ def calculate_cart(cart):
     total = 0
 
     for code, quantity in cart.items():
-
-        total += (
-            PRODUCTS[code]["price"]
-            * quantity
-        )
+        total += PRODUCTS[code]["price"] * quantity
 
     return total
 
 
 def find_product_image(product):
     for image_name in product["images"]:
-
         path = Path(image_name)
 
         if path.exists():
@@ -632,47 +569,10 @@ def find_product_image(product):
     return None
 
 
-def parse_customer_info(text):
-    name = ""
-    phone = ""
-    wilaya = ""
-
-    for line in text.splitlines():
-
-        line = line.strip()
-
-        if line.startswith("الاسم:"):
-
-            name = line.replace(
-                "الاسم:",
-                "",
-                1,
-            ).strip()
-
-        elif line.startswith("الهاتف:"):
-
-            phone = line.replace(
-                "الهاتف:",
-                "",
-                1,
-            ).strip()
-
-        elif line.startswith("الولاية:"):
-
-            wilaya = line.replace(
-                "الولاية:",
-                "",
-                1,
-            ).strip()
-
-    return name, phone, wilaya
-
-
 def build_admin_order_text(order):
     products_text = ""
 
     for item in order["items"]:
-
         products_text += (
             f"• {item['product_name']} "
             f"× {item['quantity']}\n"
@@ -680,87 +580,47 @@ def build_admin_order_text(order):
 
     return (
         "🟢 طلب جديد - GREENINK\n\n"
-
-        f"🔢 رقم الطلب: "
-        f"{order['order_number']}\n\n"
-
-        f"👤 الاسم: "
-        f"{order['customer_name']}\n"
-
-        f"📱 الهاتف: "
-        f"{order['phone']}\n"
-
-        f"📍 الولاية: "
-        f"{order['wilaya']}\n"
-
-        f"🏠 العنوان: "
-        f"{order['address']}\n\n"
-
+        f"🔢 رقم الطلب: {order['order_number']}\n\n"
+        f"👤 الاسم: {order['customer_name']}\n"
+        f"📱 الهاتف: {order['phone']}\n"
+        f"📍 الولاية: {order['wilaya']}\n"
+        f"🏠 العنوان: {order['address']}\n\n"
         "🛒 المنتجات:\n"
         f"{products_text}\n"
-
-        f"💰 المجموع: "
-        f"{order['total']:,} دج\n\n"
-
-        f"📦 الحالة: "
-        f"{order['status']}"
+        f"💰 المجموع: {order['total']:,} دج\n\n"
+        f"📦 الحالة: {order['status']}"
     )
 
 
-def customer_status_message(
-    order_number,
-    status,
-):
+def customer_status_message(order_number, status):
     if status == "✅ تم قبول الطلب":
-
-        body = (
-            "✅ تم قبول طلبك "
-            "من طرف GREENINK."
-        )
+        body = "✅ تم قبول طلبك من طرف GREENINK."
 
     elif status == "📦 قيد التحضير":
-
-        body = (
-            "📦 طلبك راه قيد "
-            "التحضير حالياً."
-        )
+        body = "📦 طلبك راه قيد التحضير حالياً."
 
     elif status == "🚚 قيد التوصيل":
-
-        body = (
-            "🚚 طلبك خرج للتوصيل."
-        )
+        body = "🚚 طلبك خرج للتوصيل."
 
     elif status == "✅ تم التسليم":
-
         body = (
             "✅ تم تسليم طلبك بنجاح.\n\n"
             "شكراً لاختيارك GREENINK."
         )
 
     elif status == "❌ تم إلغاء الطلب":
-
         body = (
             "❌ تم إلغاء طلبك.\n\n"
-            "للمزيد من المعلومات "
-            "تواصل معنا."
+            "للمزيد من المعلومات تواصل معنا."
         )
 
     else:
-
-        body = (
-            f"📦 حالة طلبك أصبحت:\n"
-            f"{status}"
-        )
+        body = f"📦 حالة طلبك أصبحت:\n{status}"
 
     return (
         "🔔 تحديث طلب GREENINK\n\n"
-
-        f"🔢 رقم الطلب: "
-        f"{order_number}\n\n"
-
+        f"🔢 رقم الطلب: {order_number}\n\n"
         f"{body}\n\n"
-
         "🟢 GREENINK"
     )
 
@@ -769,10 +629,7 @@ def customer_status_message(
 # START
 # =========================================================
 
-async def start(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["step"] = None
 
     await update.message.reply_text(
@@ -784,10 +641,7 @@ async def start(
     )
 
 
-async def my_id(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-):
+async def my_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🆔 Chat ID تاع هذا الحساب هو:\n\n"
         f"{update.effective_chat.id}"
@@ -795,7 +649,7 @@ async def my_id(
 
 
 # =========================================================
-# SHOW PRODUCTS
+# PRODUCTS
 # =========================================================
 
 async def show_printers(update: Update):
@@ -807,66 +661,46 @@ async def show_printers(update: Update):
 
     for code, product in PRODUCTS.items():
 
-        image_path = find_product_image(
-            product
-        )
+        image_path = find_product_image(product)
 
         caption = (
             f"🖨 {product['name']}\n\n"
-            f"💰 السعر: "
-            f"{product['price']:,} دج"
+            f"💰 السعر: {product['price']:,} دج"
         )
 
         if image_path:
-
             try:
 
-                with open(
-                    image_path,
-                    "rb",
-                ) as photo:
+                with open(image_path, "rb") as photo:
 
                     await update.message.reply_photo(
                         photo=photo,
                         caption=caption,
-                        reply_markup=(
-                            product_inline_keyboard(
-                                code
-                            )
-                        ),
+                        reply_markup=product_inline_keyboard(code),
                     )
 
             except Exception as error:
 
                 print(
-                    f"Image error for "
-                    f"{code}: {error}",
+                    f"Image error for {code}: {error}",
                     flush=True,
                 )
 
                 await update.message.reply_text(
                     caption,
-                    reply_markup=(
-                        product_inline_keyboard(
-                            code
-                        )
-                    ),
+                    reply_markup=product_inline_keyboard(code),
                 )
 
         else:
 
             await update.message.reply_text(
                 caption,
-                reply_markup=(
-                    product_inline_keyboard(
-                        code
-                    )
-                ),
+                reply_markup=product_inline_keyboard(code),
             )
 
 
 # =========================================================
-# DIRECT BUY
+# DIRECT ORDER
 # =========================================================
 
 async def start_direct_order_callback(
@@ -874,68 +708,44 @@ async def start_direct_order_callback(
     context,
     product_code,
 ):
-    product = PRODUCTS.get(
-        product_code
-    )
+    product = PRODUCTS.get(product_code)
 
     if not product:
-
         await query.answer(
             "❌ المنتج غير موجود",
             show_alert=True,
         )
-
         return
 
     context.user_data["cart"] = {
         product_code: 1
     }
 
-    context.user_data[
-        "direct_order"
-    ] = True
-
-    context.user_data[
-        "step"
-    ] = "customer_info"
+    context.user_data["direct_order"] = True
+    context.user_data["step"] = "name"
 
     await query.answer()
 
     await query.message.reply_text(
         "🛍️ شراء مباشر\n\n"
-
         f"🖨 {product['name']}\n"
         f"💰 {product['price']:,} دج\n\n"
-
-        "أرسل معلوماتك في "
-        "رسالة واحدة هكذا:\n\n"
-
-        "الاسم: محمد\n"
-        "الهاتف: 0550000000\n"
-        "الولاية: تلمسان"
+        "👤 اكتب اسمك الكامل:"
     )
 
-
-# =========================================================
-# ADD PRODUCT TO CART
-# =========================================================
 
 async def add_product_callback(
     query,
     context,
     product_code,
 ):
-    product = PRODUCTS.get(
-        product_code
-    )
+    product = PRODUCTS.get(product_code)
 
     if not product:
-
         await query.answer(
             "❌ المنتج غير موجود",
             show_alert=True,
         )
-
         return
 
     cart = context.user_data.setdefault(
@@ -944,8 +754,7 @@ async def add_product_callback(
     )
 
     cart[product_code] = (
-        cart.get(product_code, 0)
-        + 1
+        cart.get(product_code, 0) + 1
     )
 
     await query.answer(
@@ -954,10 +763,8 @@ async def add_product_callback(
 
     await query.message.reply_text(
         "🛒 تمت الإضافة للسلة\n\n"
-
         f"🖨 {product['name']}\n"
-        f"🔢 الكمية: "
-        f"{cart[product_code]}"
+        f"🔢 الكمية: {cart[product_code]}"
     )
 
 
@@ -975,13 +782,10 @@ async def show_cart(
     )
 
     if not cart:
-
         await update.message.reply_text(
-            "🛒 سلة المشتريات "
-            "فارغة حالياً.",
+            "🛒 سلة المشتريات فارغة حالياً.",
             reply_markup=main_keyboard(),
         )
-
         return
 
     text = "🛒 سلة المشتريات\n\n"
@@ -992,30 +796,19 @@ async def show_cart(
 
         product = PRODUCTS[code]
 
-        subtotal = (
-            product["price"]
-            * quantity
-        )
-
+        subtotal = product["price"] * quantity
         total += subtotal
 
         text += (
             f"🖨 {product['name']}\n"
-
-            f"💰 السعر: "
-            f"{product['price']:,} دج\n"
-
-            f"🔢 الكمية: "
-            f"{quantity}\n"
-
-            f"💵 المجموع: "
-            f"{subtotal:,} دج\n\n"
+            f"💰 السعر: {product['price']:,} دج\n"
+            f"🔢 الكمية: {quantity}\n"
+            f"💵 المجموع: {subtotal:,} دج\n\n"
         )
 
     text += (
         "━━━━━━━━━━━━━━\n"
-        f"💰 المجموع الإجمالي: "
-        f"{total:,} دج"
+        f"💰 المجموع الإجمالي: {total:,} دج"
     )
 
     await update.message.reply_text(
@@ -1023,10 +816,6 @@ async def show_cart(
         reply_markup=cart_keyboard(),
     )
 
-
-# =========================================================
-# BEGIN CART ORDER
-# =========================================================
 
 async def begin_order(
     update: Update,
@@ -1038,106 +827,114 @@ async def begin_order(
     )
 
     if not cart:
-
         await update.message.reply_text(
             "❌ السلة فارغة.",
             reply_markup=main_keyboard(),
         )
-
         return
 
-    context.user_data[
-        "direct_order"
-    ] = False
-
-    context.user_data[
-        "step"
-    ] = "customer_info"
+    context.user_data["direct_order"] = False
+    context.user_data["step"] = "name"
 
     await update.message.reply_text(
         "📝 معلومات الطلب\n\n"
-
-        "أرسل معلوماتك في "
-        "رسالة واحدة هكذا:\n\n"
-
-        "الاسم: محمد\n"
-        "الهاتف: 0550000000\n"
-        "الولاية: تلمسان"
+        "👤 اكتب اسمك الكامل:"
     )
 
 
 # =========================================================
-# CUSTOMER DATA
+# CUSTOMER INFO STEPS
 # =========================================================
 
 async def process_order_data(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
-    step = context.user_data.get(
-        "step"
-    )
+    step = context.user_data.get("step")
 
     if not step:
         return False
 
     text = update.message.text.strip()
 
-    if step == "customer_info":
+    if step == "name":
 
-        name, phone, wilaya = (
-            parse_customer_info(text)
-        )
-
-        if (
-            not name
-            or not phone
-            or not wilaya
-        ):
-
+        if len(text) < 2:
             await update.message.reply_text(
-                "❌ المعلومات ناقصة.\n\n"
-
-                "أرسلها بهذا الشكل:\n\n"
-
-                "الاسم: محمد\n"
-                "الهاتف: 0550000000\n"
-                "الولاية: تلمسان"
+                "❌ الاسم قصير بزاف.\n"
+                "👤 اكتب اسمك الكامل:"
             )
-
             return True
 
-        context.user_data[
-            "customer_name"
-        ] = name
-
-        context.user_data[
-            "customer_phone"
-        ] = phone
-
-        context.user_data[
-            "customer_wilaya"
-        ] = wilaya
-
-        context.user_data[
-            "step"
-        ] = "address"
+        context.user_data["customer_name"] = text
+        context.user_data["step"] = "phone"
 
         await update.message.reply_text(
-            "🏠 أرسل العنوان الكامل:"
+            "📱 اكتب رقم الهاتف:"
+        )
+
+        return True
+
+    if step == "phone":
+
+        clean_phone = (
+            text
+            .replace(" ", "")
+            .replace("-", "")
+        )
+
+        if not clean_phone.isdigit():
+            await update.message.reply_text(
+                "❌ رقم الهاتف لازم يكون أرقام فقط.\n\n"
+                "📱 اكتب رقم الهاتف:"
+            )
+            return True
+
+        if len(clean_phone) < 9:
+            await update.message.reply_text(
+                "❌ رقم الهاتف قصير.\n\n"
+                "📱 اكتب رقم الهاتف:"
+            )
+            return True
+
+        context.user_data["customer_phone"] = clean_phone
+        context.user_data["step"] = "wilaya"
+
+        await update.message.reply_text(
+            "📍 اكتب اسم الولاية:"
+        )
+
+        return True
+
+    if step == "wilaya":
+
+        if len(text) < 2:
+            await update.message.reply_text(
+                "❌ اسم الولاية غير صحيح.\n\n"
+                "📍 اكتب اسم الولاية:"
+            )
+            return True
+
+        context.user_data["customer_wilaya"] = text
+        context.user_data["step"] = "address"
+
+        await update.message.reply_text(
+            "🏠 اكتب العنوان الكامل:"
         )
 
         return True
 
     if step == "address":
 
-        context.user_data[
-            "customer_address"
-        ] = text
+        if len(text) < 3:
+            await update.message.reply_text(
+                "❌ العنوان قصير بزاف.\n\n"
+                "🏠 اكتب العنوان الكامل:"
+            )
+            return True
 
-        context.user_data[
-            "step"
-        ] = "final_confirm"
+        context.user_data["customer_address"] = text
+        context.user_data["step"] = "final_confirm"
 
         cart = context.user_data.get(
             "cart",
@@ -1148,7 +945,6 @@ async def process_order_data(
 
         summary = (
             "📦 مراجعة الطلب\n\n"
-
             f"👤 الاسم: "
             f"{context.user_data['customer_name']}\n"
 
@@ -1175,10 +971,7 @@ async def process_order_data(
 
         summary += (
             "\n━━━━━━━━━━━━━━\n"
-
-            f"💰 المجموع: "
-            f"{total:,} دج\n\n"
-
+            f"💰 المجموع: {total:,} دج\n\n"
             "هل تؤكد الطلب؟"
         )
 
@@ -1193,7 +986,7 @@ async def process_order_data(
 
 
 # =========================================================
-# SEND ORDER TO ADMINS
+# ADMIN NOTIFICATIONS
 # =========================================================
 
 async def send_order_to_admins(
@@ -1203,38 +996,29 @@ async def send_order_to_admins(
     if not ADMIN_CHAT_IDS:
 
         print(
-            "ADMIN_CHAT_IDS "
-            "is not configured",
+            "ADMIN_CHAT_IDS is not configured",
             flush=True,
         )
 
         return
 
-    order = get_order(
-        order_number
-    )
+    order = get_order(order_number)
 
     if not order:
         return
 
-    text = build_admin_order_text(
-        order
-    )
+    text = build_admin_order_text(order)
 
     for admin_id in ADMIN_CHAT_IDS:
 
         try:
 
-            message = (
-                await context.bot.send_message(
-                    chat_id=admin_id,
-                    text=text,
-                    reply_markup=(
-                        admin_order_keyboard(
-                            order_number
-                        )
-                    ),
-                )
+            message = await context.bot.send_message(
+                chat_id=admin_id,
+                text=text,
+                reply_markup=admin_order_keyboard(
+                    order_number
+                ),
             )
 
             save_admin_message(
@@ -1279,13 +1063,10 @@ async def final_confirm(
         while True:
 
             order_number = (
-                f"GR-"
-                f"{random.randint(100000, 999999)}"
+                f"GR-{random.randint(100000, 999999)}"
             )
 
-            if not order_exists(
-                order_number
-            ):
+            if not order_exists(order_number):
                 break
 
     except Exception as error:
@@ -1296,61 +1077,39 @@ async def final_confirm(
         )
 
         await update.message.reply_text(
-            "❌ تعذر الاتصال "
-            "بقاعدة البيانات."
+            "❌ تعذر الاتصال بقاعدة البيانات."
         )
 
         return
 
-    total = calculate_cart(
-        cart
-    )
+    total = calculate_cart(cart)
 
     order = {
         "number": order_number,
-
-        "chat_id":
-            update.effective_chat.id,
-
-        "user_id":
-            update.effective_user.id,
-
-        "name":
-            context.user_data.get(
-                "customer_name",
-                "",
-            ),
-
-        "phone":
-            context.user_data.get(
-                "customer_phone",
-                "",
-            ),
-
-        "wilaya":
-            context.user_data.get(
-                "customer_wilaya",
-                "",
-            ),
-
-        "address":
-            context.user_data.get(
-                "customer_address",
-                "",
-            ),
-
-        "cart":
-            cart.copy(),
-
-        "total":
-            total,
-
-        "status":
-            "🟡 جديد",
+        "chat_id": update.effective_chat.id,
+        "user_id": update.effective_user.id,
+        "name": context.user_data.get(
+            "customer_name",
+            "",
+        ),
+        "phone": context.user_data.get(
+            "customer_phone",
+            "",
+        ),
+        "wilaya": context.user_data.get(
+            "customer_wilaya",
+            "",
+        ),
+        "address": context.user_data.get(
+            "customer_address",
+            "",
+        ),
+        "cart": cart.copy(),
+        "total": total,
+        "status": "🟡 جديد",
     }
 
     try:
-
         save_order(order)
 
     except Exception as error:
@@ -1361,8 +1120,7 @@ async def final_confirm(
         )
 
         await update.message.reply_text(
-            "❌ حدث خطأ أثناء "
-            "حفظ الطلب."
+            "❌ حدث خطأ أثناء حفظ الطلب."
         )
 
         return
@@ -1373,18 +1131,10 @@ async def final_confirm(
 
     await update.message.reply_text(
         "✅ تم تأكيد طلبك بنجاح\n\n"
-
-        f"🔢 رقم الطلب: "
-        f"{order_number}\n"
-
-        f"💰 المجموع: "
-        f"{total:,} دج\n"
-
+        f"🔢 رقم الطلب: {order_number}\n"
+        f"💰 المجموع: {total:,} دج\n"
         "📦 الحالة: جديد\n\n"
-
-        "احتفظ برقم الطلب "
-        "للمتابعة.\n\n"
-
+        "احتفظ برقم الطلب للمتابعة.\n\n"
         "🟢 GREENINK",
         reply_markup=main_keyboard(),
     )
@@ -1439,15 +1189,16 @@ async def show_orders(
     for order in orders:
 
         text += (
-            f"🔢 {order['order_number']}\n"
+            f"🔢 رقم الطلب: "
+            f"{order['order_number']}\n"
 
-            f"💰 "
+            f"💰 المبلغ: "
             f"{order['total']:,} دج\n"
 
-            f"📍 "
+            f"📍 الولاية: "
             f"{order['wilaya']}\n"
 
-            f"📦 "
+            f"📦 الحالة: "
             f"{order['status']}\n"
 
             "━━━━━━━━━━━━━━\n"
@@ -1467,16 +1218,12 @@ async def update_admin_messages(
     context,
     order_number,
 ):
-    order = get_order(
-        order_number
-    )
+    order = get_order(order_number)
 
     if not order:
         return
 
-    text = build_admin_order_text(
-        order
-    )
+    text = build_admin_order_text(order)
 
     messages = get_admin_messages(
         order_number
@@ -1490,17 +1237,12 @@ async def update_admin_messages(
                 chat_id=item[
                     "admin_chat_id"
                 ],
-
                 message_id=item[
                     "message_id"
                 ],
-
                 text=text,
-
-                reply_markup=(
-                    admin_order_keyboard(
-                        order_number
-                    )
+                reply_markup=admin_order_keyboard(
+                    order_number
                 ),
             )
 
@@ -1521,9 +1263,7 @@ async def finish_delivery_without_image(
     context,
     order_number,
 ):
-    order = get_order(
-        order_number
-    )
+    order = get_order(order_number)
 
     if not order:
         return
@@ -1542,7 +1282,6 @@ async def finish_delivery_without_image(
         chat_id=order[
             "customer_chat_id"
         ],
-
         text=customer_status_message(
             order_number,
             "🚚 قيد التوصيل",
@@ -1551,7 +1290,7 @@ async def finish_delivery_without_image(
 
 
 # =========================================================
-# CALLBACKS
+# CALLBACK HANDLER
 # =========================================================
 
 async def callback_handler(
@@ -1563,10 +1302,7 @@ async def callback_handler(
     try:
 
         action, value = (
-            query.data.split(
-                ":",
-                1,
-            )
+            query.data.split(":", 1)
         )
 
     except Exception:
@@ -1578,9 +1314,9 @@ async def callback_handler(
 
         return
 
-    # -----------------------------------------------------
-    # CUSTOMER PRODUCT BUTTONS
-    # -----------------------------------------------------
+    # -------------------------------
+    # CUSTOMER PRODUCT ACTIONS
+    # -------------------------------
 
     if action == "buy":
 
@@ -1602,17 +1338,16 @@ async def callback_handler(
 
         return
 
-    # -----------------------------------------------------
-    # ADMIN SECURITY
-    # -----------------------------------------------------
+    # -------------------------------
+    # ADMIN CHECK
+    # -------------------------------
 
     admin_id = query.from_user.id
 
     if admin_id not in ADMIN_CHAT_IDS:
 
         await query.answer(
-            "❌ غير مسموح لك "
-            "بإدارة الطلبات",
+            "❌ غير مسموح لك بإدارة الطلبات",
             show_alert=True,
         )
 
@@ -1620,9 +1355,9 @@ async def callback_handler(
 
     order_number = value
 
-    # -----------------------------------------------------
-    # DELIVERY MAIN
-    # -----------------------------------------------------
+    # -------------------------------
+    # DELIVERY
+    # -------------------------------
 
     if action == "delivery":
 
@@ -1643,29 +1378,18 @@ async def callback_handler(
 
         await context.bot.send_message(
             chat_id=admin_id,
-
             text=(
                 "🚚 تجهيز التوصيل\n\n"
-
                 f"🔢 الطلب: "
                 f"{order_number}\n\n"
-
-                "هل تريد إرسال "
-                "صورة تتبع الطرد؟"
+                "هل تريد إرسال صورة تتبع الطرد؟"
             ),
-
-            reply_markup=(
-                delivery_photo_keyboard(
-                    order_number
-                )
+            reply_markup=delivery_photo_keyboard(
+                order_number
             ),
         )
 
         return
-
-    # -----------------------------------------------------
-    # DELIVERY IMAGE MODE
-    # -----------------------------------------------------
 
     if action in (
         "delivery_camera",
@@ -1680,30 +1404,21 @@ async def callback_handler(
 
         await context.bot.send_message(
             chat_id=admin_id,
-
             text=(
                 "📸 أرسل الآن صورة "
                 "وصل أو تتبع الطرد.\n\n"
-
                 "استعمل زر 📎 أو 📷 "
                 "في Telegram.\n\n"
-
-                f"🔢 الطلب: "
-                f"{order_number}"
+                f"🔢 الطلب: {order_number}"
             ),
         )
 
         return
 
-    # -----------------------------------------------------
-    # DELIVERY SKIP IMAGE
-    # -----------------------------------------------------
-
     if action == "delivery_skip":
 
         await query.answer(
-            "تم تحويل الطلب "
-            "للتوصيل ✅"
+            "تم تحويل الطلب للتوصيل ✅"
         )
 
         await finish_delivery_without_image(
@@ -1712,10 +1427,6 @@ async def callback_handler(
         )
 
         return
-
-    # -----------------------------------------------------
-    # DELIVERY CANCEL
-    # -----------------------------------------------------
 
     if action == "delivery_cancel":
 
@@ -1730,9 +1441,9 @@ async def callback_handler(
 
         return
 
-    # -----------------------------------------------------
-    # NORMAL ADMIN STATUS
-    # -----------------------------------------------------
+    # -------------------------------
+    # NORMAL ADMIN STATUSES
+    # -------------------------------
 
     order = get_order(
         order_number
@@ -1748,17 +1459,10 @@ async def callback_handler(
         return
 
     status_map = {
-        "accept":
-            "✅ تم قبول الطلب",
-
-        "prepare":
-            "📦 قيد التحضير",
-
-        "done":
-            "✅ تم التسليم",
-
-        "cancel":
-            "❌ تم إلغاء الطلب",
+        "accept": "✅ تم قبول الطلب",
+        "prepare": "📦 قيد التحضير",
+        "done": "✅ تم التسليم",
+        "cancel": "❌ تم إلغاء الطلب",
     }
 
     new_status = status_map.get(
@@ -1802,7 +1506,6 @@ async def callback_handler(
             chat_id=order[
                 "customer_chat_id"
             ],
-
             text=customer_status_message(
                 order_number,
                 new_status,
@@ -1831,10 +1534,8 @@ async def handle_photo(
     if admin_id not in ADMIN_CHAT_IDS:
         return
 
-    order_number = (
-        context.user_data.get(
-            "pending_delivery_order"
-        )
+    order_number = context.user_data.get(
+        "pending_delivery_order"
     )
 
     if not order_number:
@@ -1853,7 +1554,6 @@ async def handle_photo(
         return
 
     photo = update.message.photo[-1]
-
     file_id = photo.file_id
 
     try:
@@ -1901,7 +1601,6 @@ async def handle_photo(
         chat_id=order[
             "customer_chat_id"
         ],
-
         text=customer_status_message(
             order_number,
             "🚚 قيد التوصيل",
@@ -1912,25 +1611,19 @@ async def handle_photo(
         chat_id=order[
             "customer_chat_id"
         ],
-
         photo=file_id,
-
         caption=(
             "📦 صورة تتبع الطرد\n\n"
-
             f"🔢 رقم الطلب: "
             f"{order_number}\n"
-
-            "🚚 طلبك راه "
-            "قيد التوصيل.\n\n"
-
+            "🚚 طلبك راه قيد التوصيل.\n\n"
             "🟢 GREENINK"
         ),
     )
 
 
 # =========================================================
-# TEXT BUTTONS
+# TEXT HANDLER
 # =========================================================
 
 async def buttons(
@@ -1944,7 +1637,9 @@ async def buttons(
     )
 
     if step in (
-        "customer_info",
+        "name",
+        "phone",
+        "wilaya",
         "address",
     ):
 
@@ -1967,17 +1662,9 @@ async def buttons(
 
     elif text == "❌ إلغاء الطلب":
 
-        context.user_data[
-            "step"
-        ] = None
-
-        context.user_data[
-            "direct_order"
-        ] = False
-
-        context.user_data[
-            "cart"
-        ] = {}
+        context.user_data["step"] = None
+        context.user_data["direct_order"] = False
+        context.user_data["cart"] = {}
 
         await update.message.reply_text(
             "❌ تم إلغاء الطلب.",
@@ -2013,9 +1700,7 @@ async def buttons(
 
     elif text == "🗑 تفريغ السلة":
 
-        context.user_data[
-            "cart"
-        ] = {}
+        context.user_data["cart"] = {}
 
         await update.message.reply_text(
             "🗑 تم تفريغ السلة.",
@@ -2049,13 +1734,10 @@ async def buttons(
 
         await update.message.reply_text(
             "☎️ اتصل بنا - GREENINK\n\n"
-
             "📱 0560095387\n"
             "أبوبكر\n\n"
-
             "📱 0775635460\n"
             "عبد الحق\n\n"
-
             "🟢 نحن في خدمتكم.",
             reply_markup=main_keyboard(),
         )
@@ -2096,10 +1778,7 @@ async def post_init(application):
 
     last_error = None
 
-    for attempt in range(
-        1,
-        4,
-    ):
+    for attempt in range(1, 4):
 
         try:
 
