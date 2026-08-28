@@ -170,6 +170,16 @@ PRODUCTS = {
 
 
 # =========================================================
+# PRINTER / INK COMPATIBILITY
+# =========================================================
+
+PRINTER_INK_COMPATIBILITY = {
+    "WF-C5390": ["INK-5390-5890"],
+    "WF-C5890": ["INK-5390-5890"],
+}
+
+
+# =========================================================
 # WILAYAS
 # =========================================================
 
@@ -244,8 +254,8 @@ def main_keyboard():
         [
             ["🔥 العروض", "🖨 الطابعات"],
             ["🧴 الأحبار", "⚙️ قطع الغيار"],
-            ["🛒 السلة", "📦 طلباتي"],
-            ["☎️ اتصل بنا"],
+            ["🔎 حبر لطابعتي", "🛒 السلة"],
+            ["📦 طلباتي", "☎️ اتصل بنا"],
         ],
         resize_keyboard=True,
     )
@@ -256,6 +266,7 @@ def shop_keyboard():
         [
             ["🔥 العروض", "🛒 السلة"],
             ["🖨 الطابعات", "🧴 الأحبار"],
+            ["🔎 حبر لطابعتي"],
             ["🏠 الرئيسية"],
         ],
         resize_keyboard=True,
@@ -452,6 +463,9 @@ def init_database():
                     total INTEGER NOT NULL,
                     status TEXT NOT NULL DEFAULT '🆕 طلب جديد',
                     shipment_image_file_id TEXT,
+                    accepted_by_id BIGINT,
+                    accepted_by_name TEXT,
+                    accepted_at TIMESTAMPTZ,
                     created_at TIMESTAMPTZ DEFAULT NOW(),
                     updated_at TIMESTAMPTZ DEFAULT NOW()
                 )
@@ -469,6 +483,27 @@ def init_database():
                 """
                 ALTER TABLE orders
                 ADD COLUMN IF NOT EXISTS shipment_image_file_id TEXT
+                """
+            )
+
+            cur.execute(
+                """
+                ALTER TABLE orders
+                ADD COLUMN IF NOT EXISTS accepted_by_id BIGINT
+                """
+            )
+
+            cur.execute(
+                """
+                ALTER TABLE orders
+                ADD COLUMN IF NOT EXISTS accepted_by_name TEXT
+                """
+            )
+
+            cur.execute(
+                """
+                ALTER TABLE orders
+                ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ
                 """
             )
 
@@ -721,6 +756,37 @@ def update_order_status(order_number, status):
         conn.commit()
 
 
+def accept_order_once(order_number, admin_id, admin_name):
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE orders
+                SET
+                    status = '✅ تم قبول الطلب',
+                    accepted_by_id = %s,
+                    accepted_by_name = %s,
+                    accepted_at = NOW(),
+                    updated_at = NOW()
+                WHERE order_number = %s
+                  AND status = '🆕 طلب جديد'
+                  AND accepted_by_id IS NULL
+                RETURNING order_number
+                """,
+                (
+                    admin_id,
+                    admin_name,
+                    order_number,
+                ),
+            )
+
+            result = cur.fetchone()
+
+        conn.commit()
+
+    return result is not None
+
+
 def save_shipment_image(order_number, file_id):
     with db_connect() as conn:
         with conn.cursor() as cur:
@@ -917,7 +983,51 @@ def build_order_text(data):
         ]
     )
 
+    if order.get("accepted_by_name"):
+        lines.extend(
+            [
+                "",
+                f"✅ قُبل بواسطة: {order['accepted_by_name']}",
+            ]
+        )
+
+        if order.get("accepted_at"):
+            lines.append(
+                f"🕒 وقت القبول: {order['accepted_at']}"
+            )
+
     return "\n".join(lines)
+
+
+def normalize_printer_text(text):
+    return (
+        text.upper()
+        .replace("EPSON", "")
+        .replace(" ", "")
+        .replace("_", "")
+        .replace("-", "")
+        .strip()
+    )
+
+
+def find_printer_model(text):
+    normalized = normalize_printer_text(text)
+
+    aliases = {
+        "WFC5390": "WF-C5390",
+        "5390": "WF-C5390",
+        "C5390": "WF-C5390",
+
+        "WFC5890": "WF-C5890",
+        "5890": "WF-C5890",
+        "C5890": "WF-C5890",
+    }
+
+    for alias, model in aliases.items():
+        if alias in normalized:
+            return model
+
+    return None
 
 
 # =========================================================
@@ -931,6 +1041,7 @@ async def start(
     context.user_data.pop("step", None)
     context.user_data.pop("order_data", None)
     context.user_data.pop("direct_order", None)
+    context.user_data.pop("ink_search_mode", None)
 
     await update.message.reply_text(
         (
@@ -939,7 +1050,8 @@ async def start(
             "🔥 Packs وعروض\n"
             "🖨 طابعات\n"
             "🧴 أحبار\n"
-            "⚙️ قطع غيار\n\n"
+            "⚙️ قطع غيار\n"
+            "🔎 حبر لطابعتي\n\n"
             "اختر القسم الذي تريد 👇"
         ),
         reply_markup=main_keyboard(),
@@ -1008,6 +1120,80 @@ async def show_category(
             except Exception as exc:
                 print(
                     f"Product image error {image_path}: {exc}",
+                    flush=True,
+                )
+
+        await update.message.reply_text(
+            caption,
+            reply_markup=product_inline_keyboard(code),
+        )
+
+
+async def show_compatible_inks(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    text = update.message.text.strip()
+
+    printer_model = find_printer_model(text)
+
+    if not printer_model:
+        await update.message.reply_text(
+            (
+                "❌ ما قدرتش نتعرف على موديل الطابعة.\n\n"
+                "جرّب تكتب مثلاً:\n"
+                "WF-C5890\n"
+                "5890\n"
+                "Epson 5890"
+            ),
+            reply_markup=shop_keyboard(),
+        )
+        return
+
+    ink_codes = PRINTER_INK_COMPATIBILITY.get(
+        printer_model,
+        [],
+    )
+
+    if not ink_codes:
+        await update.message.reply_text(
+            (
+                f"🔎 الطابعة: {printer_model}\n\n"
+                "حالياً ما عندناش حبر متوافق متوفر لهذا الموديل."
+            ),
+            reply_markup=shop_keyboard(),
+        )
+        return
+
+    await update.message.reply_text(
+        (
+            f"✅ لقينا حبر متوافق مع {printer_model}\n\n"
+            "المنتجات المتوفرة 👇"
+        ),
+        reply_markup=shop_keyboard(),
+    )
+
+    for code in ink_codes:
+        product = PRODUCTS.get(code)
+
+        if not product:
+            continue
+
+        caption = build_product_caption(product)
+        image_path = find_product_image(product)
+
+        if image_path:
+            try:
+                with open(image_path, "rb") as photo:
+                    await update.message.reply_photo(
+                        photo=photo,
+                        caption=caption,
+                        reply_markup=product_inline_keyboard(code),
+                    )
+                continue
+            except Exception as exc:
+                print(
+                    f"Ink image error: {exc}",
                     flush=True,
                 )
 
@@ -1488,6 +1674,81 @@ async def send_customer_status(
         )
 
 
+async def accept_order_callback(
+    query,
+    context,
+    order_number,
+):
+    if query.from_user.id not in ADMIN_CHAT_IDS:
+        await query.answer(
+            "غير مسموح.",
+            show_alert=True,
+        )
+        return
+
+    data = get_order(order_number)
+
+    if not data:
+        await query.answer(
+            "الطلب غير موجود.",
+            show_alert=True,
+        )
+        return
+
+    admin_name = (
+        query.from_user.full_name
+        or query.from_user.username
+        or str(query.from_user.id)
+    )
+
+    accepted = accept_order_once(
+        order_number,
+        query.from_user.id,
+        admin_name,
+    )
+
+    if not accepted:
+        current = get_order(order_number)
+
+        if current:
+            order = current["order"]
+
+            accepted_by = order.get("accepted_by_name")
+
+            if accepted_by:
+                await query.answer(
+                    f"✅ هذا الطلب تم قبوله مسبقًا بواسطة {accepted_by}",
+                    show_alert=True,
+                )
+            else:
+                await query.answer(
+                    "✅ هذا الطلب تم التعامل معه مسبقًا.",
+                    show_alert=True,
+                )
+        else:
+            await query.answer(
+                "الطلب غير موجود.",
+                show_alert=True,
+            )
+
+        return
+
+    await query.answer(
+        "✅ تم قبول الطلب"
+    )
+
+    await refresh_admin_messages(
+        context,
+        order_number,
+    )
+
+    await send_customer_status(
+        context,
+        order_number,
+        "✅ تم قبول الطلب",
+    )
+
+
 async def change_admin_status(
     query,
     context,
@@ -1501,9 +1762,20 @@ async def change_admin_status(
         )
         return
 
-    if not get_order(order_number):
+    data = get_order(order_number)
+
+    if not data:
         await query.answer(
             "الطلب غير موجود.",
+            show_alert=True,
+        )
+        return
+
+    order = data["order"]
+
+    if not order.get("accepted_by_id"):
+        await query.answer(
+            "⚠️ لازم قبول الطلب أولاً.",
             show_alert=True,
         )
         return
@@ -1539,6 +1811,22 @@ async def start_delivery_photo(
     if query.from_user.id not in ADMIN_CHAT_IDS:
         await query.answer(
             "غير مسموح.",
+            show_alert=True,
+        )
+        return
+
+    data = get_order(order_number)
+
+    if not data:
+        await query.answer(
+            "الطلب غير موجود.",
+            show_alert=True,
+        )
+        return
+
+    if not data["order"].get("accepted_by_id"):
+        await query.answer(
+            "⚠️ لازم قبول الطلب أولاً.",
             show_alert=True,
         )
         return
@@ -1605,6 +1893,22 @@ async def delivery_without_photo(
         )
         return
 
+    data = get_order(order_number)
+
+    if not data:
+        await query.answer(
+            "الطلب غير موجود.",
+            show_alert=True,
+        )
+        return
+
+    if not data["order"].get("accepted_by_id"):
+        await query.answer(
+            "⚠️ لازم قبول الطلب أولاً.",
+            show_alert=True,
+        )
+        return
+
     context.user_data.pop(
         "pending_delivery_order",
         None,
@@ -1643,6 +1947,17 @@ async def handle_photo(
     )
 
     if not order_number or not update.message.photo:
+        return
+
+    data = get_order(order_number)
+
+    if not data:
+        return
+
+    if not data["order"].get("accepted_by_id"):
+        await update.message.reply_text(
+            "⚠️ لازم قبول الطلب أولاً."
+        )
         return
 
     file_id = update.message.photo[-1].file_id
@@ -1817,11 +2132,10 @@ async def callbacks(
     if data.startswith("accept:"):
         order_number = data.split(":", 1)[1]
 
-        await change_admin_status(
+        await accept_order_callback(
             query,
             context,
             order_number,
-            "✅ تم قبول الطلب",
         )
         return
 
@@ -1934,7 +2248,21 @@ async def buttons(
     step = context.user_data.get("step")
 
     if text == "❌ إلغاء الطلب":
+        context.user_data.pop("ink_search_mode", None)
+
         await cancel_current_order(
+            update,
+            context,
+        )
+        return
+
+    if context.user_data.get("ink_search_mode"):
+        context.user_data.pop(
+            "ink_search_mode",
+            None,
+        )
+
+        await show_compatible_inks(
             update,
             context,
         )
@@ -1993,6 +2321,23 @@ async def buttons(
         await show_category(
             update,
             "pack",
+        )
+        return
+
+    if text == "🔎 حبر لطابعتي":
+        context.user_data[
+            "ink_search_mode"
+        ] = True
+
+        await update.message.reply_text(
+            (
+                "🔎 اكتب موديل الطابعة.\n\n"
+                "مثال:\n"
+                "WF-C5890\n"
+                "5890\n"
+                "Epson 5890"
+            ),
+            reply_markup=shop_keyboard(),
         )
         return
 
